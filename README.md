@@ -20,8 +20,7 @@ This repository is currently in bootstrap phase:
 |- Cargo.toml            # Workspace manifest
 |- PLAN.md               # Milestones and compatibility plan
 |- crates/
-|  |- data/              # Legacy format readers (.spe, levels, scripts)
-|  |- runtime/           # Bevy integration + simulation core
+|  |- runtime/           # Bevy integration + simulation + data readers
 |  |- game/              # Main executable
 |  `- tools/             # Data inspection and conversion tools
 `- docs/

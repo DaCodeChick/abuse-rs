@@ -73,8 +73,7 @@ Acceptance:
 
 ## Initial Crate Responsibilities
 
-- `crates/data`: data formats (`.spe`, level sections, script source loading).
-- `crates/runtime`: Bevy plugins for rendering/input/audio plus simulation state and rule execution.
+- `crates/runtime`: Bevy plugins for rendering/input/audio plus simulation and data formats (`.spe`, level sections, script source loading).
 - `crates/game`: executable wiring and configuration.
 - `crates/tools`: inspection and conversion tools.
 

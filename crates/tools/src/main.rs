@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use abuse_data::lisp::LispProgram;
+use abuse_runtime::data::lisp::LispProgram;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

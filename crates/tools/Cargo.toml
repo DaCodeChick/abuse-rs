@@ -4,4 +4,4 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-abuse-data = { path = "../data" }
+abuse-runtime = { path = "../runtime" }
