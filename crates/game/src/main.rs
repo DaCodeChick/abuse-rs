@@ -48,9 +48,17 @@ struct ViewerCamera;
 #[derive(Component)]
 struct ViewerHud;
 
+#[derive(Component)]
+struct DebugMarker;
+
 #[derive(Resource, Debug, Clone, Copy)]
 struct HudState {
     visible: bool,
+}
+
+#[derive(Resource, Debug, Clone, Copy)]
+struct DebugOverlayState {
+    markers_visible: bool,
 }
 
 #[derive(Resource, Debug, Clone)]
@@ -79,9 +87,20 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(ViewerConfig { level_path })
         .insert_resource(HudState { visible: true })
+        .insert_resource(DebugOverlayState {
+            markers_visible: true,
+        })
         .add_plugins(AbuseRuntimePlugins)
         .add_systems(Startup, (setup_camera, load_level_view).chain())
-        .add_systems(Update, (camera_controls, toggle_hud_visibility, update_hud))
+        .add_systems(
+            Update,
+            (
+                camera_controls,
+                toggle_hud_visibility,
+                toggle_debug_markers,
+                update_hud,
+            ),
+        )
         .run();
 }
 
@@ -97,7 +116,7 @@ fn spawn_hud(commands: &mut Commands, level: &LevelData) {
 
     commands.spawn((
         Text::new(format!(
-            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD",
+            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers",
             level_name,
             level.objects.len(),
             level.lights.len()
@@ -227,6 +246,7 @@ fn load_level_view(
         commands.spawn((
             Sprite::from_color(Color::srgba(0.92, 0.28, 0.2, 0.9), Vec2::splat(7.0)),
             Transform::from_xyz(x, y, 3.0),
+            DebugMarker,
         ));
     }
 
@@ -236,6 +256,7 @@ fn load_level_view(
         commands.spawn((
             Sprite::from_color(Color::srgba(1.0, 0.95, 0.25, 0.65), Vec2::splat(10.0)),
             Transform::from_xyz(x, y, 4.0),
+            DebugMarker,
         ));
     }
 
@@ -366,7 +387,7 @@ fn update_hud(
     let lights_line = lines.next().unwrap_or("lights: ?");
     let controls_line = lines
         .next()
-        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD");
+        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers");
 
     text.0 = format!(
         "{}\nzoom: {}%\n{}\n{}\n{}",
@@ -386,6 +407,25 @@ fn toggle_hud_visibility(
     hud_state.visible = !hud_state.visible;
     if let Ok(mut visibility) = hud_query.single_mut() {
         *visibility = if hud_state.visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+}
+
+fn toggle_debug_markers(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut overlay_state: ResMut<DebugOverlayState>,
+    mut marker_query: Query<&mut Visibility, With<DebugMarker>>,
+) {
+    if !keyboard.just_pressed(KeyCode::F2) {
+        return;
+    }
+
+    overlay_state.markers_visible = !overlay_state.markers_visible;
+    for mut visibility in &mut marker_query {
+        *visibility = if overlay_state.markers_visible {
             Visibility::Visible
         } else {
             Visibility::Hidden

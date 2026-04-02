@@ -54,6 +54,7 @@ Viewer controls:
 - Mouse wheel: zoom
 - `Q` / `E`: zoom out / in
 - `F1`: toggle debug HUD
+- `F2`: toggle object/light debug markers
 
 Lisp bootstrap tooling is available:
 
