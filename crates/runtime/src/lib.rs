@@ -2,6 +2,7 @@ use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
 pub mod data;
+pub mod viewer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompatibilityMode {

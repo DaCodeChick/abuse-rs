@@ -82,37 +82,41 @@ pub enum SpeError {
 }
 
 impl SpecType {
-    pub const fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::Invalid),
-            1 => Some(Self::ColorTable),
-            2 => Some(Self::Palette),
-            4 => Some(Self::Image),
-            5 => Some(Self::ForeTile),
-            6 => Some(Self::BackTile),
-            7 => Some(Self::Character),
-            8 => Some(Self::MorphPoints8),
-            9 => Some(Self::MorphPoints16),
-            10 => Some(Self::GrueObjs),
-            11 => Some(Self::ExternSfx),
-            12 => Some(Self::DmxMus),
-            13 => Some(Self::PatchedMorph),
-            14 => Some(Self::NormalFile),
-            15 => Some(Self::Compress1File),
-            16 => Some(Self::VectorImage),
-            17 => Some(Self::LightList),
-            18 => Some(Self::GrueFgMap),
-            19 => Some(Self::GrueBgMap),
-            20 => Some(Self::DataArray),
-            21 => Some(Self::Character2),
-            22 => Some(Self::Particle),
-            23 => Some(Self::ExternalLcache),
-            _ => None,
-        }
-    }
-
     pub const fn as_u8(self) -> u8 {
         self as u8
+    }
+}
+
+impl TryFrom<u8> for SpecType {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Invalid),
+            1 => Ok(Self::ColorTable),
+            2 => Ok(Self::Palette),
+            4 => Ok(Self::Image),
+            5 => Ok(Self::ForeTile),
+            6 => Ok(Self::BackTile),
+            7 => Ok(Self::Character),
+            8 => Ok(Self::MorphPoints8),
+            9 => Ok(Self::MorphPoints16),
+            10 => Ok(Self::GrueObjs),
+            11 => Ok(Self::ExternSfx),
+            12 => Ok(Self::DmxMus),
+            13 => Ok(Self::PatchedMorph),
+            14 => Ok(Self::NormalFile),
+            15 => Ok(Self::Compress1File),
+            16 => Ok(Self::VectorImage),
+            17 => Ok(Self::LightList),
+            18 => Ok(Self::GrueFgMap),
+            19 => Ok(Self::GrueBgMap),
+            20 => Ok(Self::DataArray),
+            21 => Ok(Self::Character2),
+            22 => Ok(Self::Particle),
+            23 => Ok(Self::ExternalLcache),
+            _ => Err(()),
+        }
     }
 }
 
@@ -171,9 +175,9 @@ impl SpeDirectory {
                 path: path_ref.to_path_buf(),
                 source,
             })?;
-            let spec_type = match SpecType::from_u8(raw_type) {
-                Some(value) => value,
-                None => {
+            let spec_type = match SpecType::try_from(raw_type) {
+                Ok(value) => value,
+                Err(()) => {
                     if mode == SpeParseMode::Strict {
                         return Err(SpeError::InvalidType {
                             index,
@@ -272,14 +276,14 @@ mod tests {
     #[test]
     fn spec_type_roundtrip_known_values() {
         for value in [0_u8, 1, 2, 4, 14, 23] {
-            let parsed = SpecType::from_u8(value).expect("known type should parse");
+            let parsed = SpecType::try_from(value).expect("known type should parse");
             assert_eq!(parsed.as_u8(), value);
         }
     }
 
     #[test]
     fn spec_type_rejects_unknown_values() {
-        assert_eq!(SpecType::from_u8(3), None);
-        assert_eq!(SpecType::from_u8(255), None);
+        assert!(SpecType::try_from(3).is_err());
+        assert!(SpecType::try_from(255).is_err());
     }
 }

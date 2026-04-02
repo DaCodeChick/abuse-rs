@@ -27,6 +27,17 @@ This repository is currently in bootstrap phase:
    `- decisions/         # Architecture and format notes
 ```
 
+## Runtime Viewer Modules
+
+Viewer implementation is split into runtime modules under `crates/runtime/src/viewer`:
+
+- `constants.rs`: tile/object archive lists and shared constants
+- `assets.rs`: legacy SPE palette/image decoding and texture library loading
+- `object_render.rs`: object type/state/frame -> sprite mapping + placement offsets
+- `audio.rs`: object-driven one-shot SFX state and control systems
+
+This keeps `crates/game/src/main.rs` focused on app composition and scene wiring.
+
 ## Getting Started
 
 ```bash

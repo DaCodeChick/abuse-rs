@@ -1,64 +1,24 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::Duration;
-use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 
 use abuse_runtime::AbuseRuntimePlugins;
-use abuse_runtime::data::level::{LevelData, VAR_CUR_FRAME, VAR_X, VAR_Y};
-use abuse_runtime::data::spe::{SpeDirectory, SpecType};
-use bevy::asset::RenderAssetUsages;
-use bevy::audio::Volume;
+use abuse_runtime::data::level::{LevelData, VAR_X, VAR_Y};
+use abuse_runtime::viewer::assets::{
+    derive_data_root, load_legacy_tile_set, load_object_sprite_library, make_radial_glow_texture,
+};
+use abuse_runtime::viewer::audio::{
+    AudioState, adjust_audio_volume, spawn_context_audio, sync_audio_volume, toggle_audio,
+};
+use abuse_runtime::viewer::constants::FG_TILE_SIZE;
+use abuse_runtime::viewer::object_render::{object_render_adjustment, resolve_object_sprite};
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::MessageReader;
 use bevy::prelude::*;
-use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
-use byteorder::{LittleEndian, ReadBytesExt};
 
-const FG_TILE_SIZE: f32 = 32.0;
 const CAMERA_PAN_SPEED: f32 = 900.0;
 const CAMERA_ZOOM_STEP: f32 = 0.1;
 const CAMERA_MIN_SCALE: f32 = 0.2;
 const CAMERA_MAX_SCALE: f32 = 12.0;
-
-const FG_TILE_SPE_FILES: &[&str] = &[
-    "art/fore/foregrnd.spe",
-    "art/fore/techno.spe",
-    "art/fore/techno2.spe",
-    "art/fore/techno3.spe",
-    "art/fore/techno4.spe",
-    "art/fore/cave.spe",
-    "art/fore/alien.spe",
-    "art/fore/trees.spe",
-    "art/fore/endgame.spe",
-    "art/fore/trees2.spe",
-];
-
-const BG_TILE_SPE_FILES: &[&str] = &[
-    "art/back/backgrnd.spe",
-    "art/back/intro.spe",
-    "art/back/city.spe",
-    "art/back/cave.spe",
-    "art/back/tech.spe",
-    "art/back/alienb.spe",
-    "art/back/green2.spe",
-    "art/back/galien.spe",
-];
-
-const OBJECT_SPE_FILES: &[&str] = &[
-    "art/door.spe",
-    "art/chars/door.spe",
-    "art/chars/tdoor.spe",
-    "art/chars/teleport.spe",
-    "art/chars/platform.spe",
-    "art/chars/lightin.spe",
-    "art/chars/lava.spe",
-    "art/chars/step.spe",
-    "art/ball.spe",
-    "art/compass.spe",
-    "art/rob2.spe",
-    "art/misc.spe",
-];
 
 #[derive(Component)]
 struct ViewerCamera;
@@ -80,39 +40,6 @@ struct ViewerConfig {
 struct LevelViewBounds {
     width: f32,
     height: f32,
-}
-
-#[derive(Resource, Debug, Clone)]
-struct AudioState {
-    enabled: bool,
-    volume: f32,
-}
-
-#[derive(Component)]
-struct OneShotAudio;
-
-#[derive(Debug, Clone)]
-struct LegacyTileSet {
-    fg_tiles: HashMap<u16, Handle<Image>>,
-    bg_tiles: HashMap<u16, Handle<Image>>,
-    fg_tile_size: Vec2,
-    bg_tile_size: Vec2,
-}
-
-#[derive(Debug, Clone)]
-struct ObjectSpriteLibrary {
-    sprites: HashMap<(String, String), Handle<Image>>,
-}
-
-impl ObjectSpriteLibrary {
-    fn get(&self, spe_path: &str, entry_name: &str) -> Option<Handle<Image>> {
-        self.sprites
-            .get(&(
-                spe_path.to_ascii_lowercase(),
-                entry_name.to_ascii_lowercase(),
-            ))
-            .cloned()
-    }
 }
 
 fn main() {
@@ -151,13 +78,6 @@ fn main() {
             ),
         )
         .run();
-}
-
-fn derive_data_root(level_path: &Path) -> Option<PathBuf> {
-    level_path
-        .parent()
-        .and_then(|p| p.parent())
-        .map(PathBuf::from)
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -214,7 +134,7 @@ fn load_level_view(
         }
     };
 
-    let tile_set = load_legacy_tile_set(level_path, &mut images)
+    let tile_set = load_legacy_tile_set(level_path, &mut images, FG_TILE_SIZE)
         .inspect_err(|err| warn!("Tile asset loading failed, falling back to debug colors: {err}"))
         .ok();
 
@@ -370,225 +290,6 @@ fn load_level_view(
     spawn_hud(&mut commands, &level, &audio_state);
 }
 
-fn spawn_context_audio(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    audio_state: &AudioState,
-    level: &LevelData,
-) {
-    if !audio_state.enabled || audio_state.volume <= 0.0 {
-        return;
-    }
-
-    let mut has_tp_door = false;
-    let mut has_tele2 = false;
-    let mut has_spring = false;
-    let mut has_lava = false;
-    let mut has_force_field = false;
-
-    for object in &level.objects {
-        if let Some(name) = object.type_name.as_deref() {
-            match name {
-                "TP_DOOR" | "NEXT_LEVEL" | "NEXT_LEVEL_TOP" => has_tp_door = true,
-                "TELE2" | "TELE_BEAM" => has_tele2 = true,
-                "SPRING" => has_spring = true,
-                "LAVA" => has_lava = true,
-                "FORCE_FIELD" | "LIGHTIN" => has_force_field = true,
-                _ => {}
-            }
-        }
-    }
-
-    if has_tp_door {
-        spawn_one_shot(
-            commands,
-            asset_server,
-            "sfx/telept01.wav",
-            audio_state.volume * 0.45,
-            Some(1.8),
-        );
-    }
-    if has_tele2 {
-        spawn_one_shot(
-            commands,
-            asset_server,
-            "sfx/fadeon01.wav",
-            audio_state.volume * 0.38,
-            Some(1.6),
-        );
-    }
-    if has_spring {
-        spawn_one_shot(
-            commands,
-            asset_server,
-            "sfx/spring03.wav",
-            audio_state.volume * 0.35,
-            Some(1.0),
-        );
-    }
-    if has_lava {
-        spawn_one_shot(
-            commands,
-            asset_server,
-            "sfx/lava01.wav",
-            audio_state.volume * 0.3,
-            Some(1.4),
-        );
-    }
-    if has_force_field {
-        spawn_one_shot(
-            commands,
-            asset_server,
-            "sfx/force01.wav",
-            audio_state.volume * 0.32,
-            Some(1.2),
-        );
-    }
-}
-
-fn spawn_one_shot(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    path: &'static str,
-    volume: f32,
-    max_duration_secs: Option<f32>,
-) {
-    let mut settings =
-        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume.clamp(0.0, 1.0)));
-    if let Some(seconds) = max_duration_secs {
-        settings = settings.with_duration(Duration::from_secs_f32(seconds.max(0.05)));
-    }
-
-    commands.spawn((
-        AudioPlayer::new(asset_server.load(path)),
-        settings,
-        OneShotAudio,
-    ));
-}
-
-fn object_render_adjustment(type_name: Option<&str>) -> (f32, f32, f32) {
-    match type_name.unwrap_or_default() {
-        "NEXT_LEVEL" => (0.0, -4.0, 2.7),
-        "NEXT_LEVEL_TOP" => (0.0, -8.0, 2.71),
-        "TELE_BEAM" => (0.0, -6.0, 2.72),
-        "TP_DOOR" | "SWITCH_DOOR" | "TRAP_DOOR2" | "TRAP_DOOR3" => (0.0, -3.0, 2.65),
-        "SPRING" => (0.0, -2.0, 2.6),
-        "LAVA" => (0.0, -1.0, 2.55),
-        "HEALTH" | "POWER_FAST" | "POWER_FLY" | "POWER_SNEAKY" | "POWER_HEALTH" => (0.0, 6.0, 2.9),
-        "WHO" => (0.0, -4.0, 2.8),
-        _ => (0.0, 0.0, 2.5),
-    }
-}
-
-fn resolve_object_sprite(
-    object: &abuse_runtime::data::level::LoadedObject,
-) -> Option<(&'static str, String)> {
-    let type_name = object.type_name.as_deref()?;
-    let state_name = object.state_name.as_deref().unwrap_or("stopped");
-    let frame = object.var(VAR_CUR_FRAME).unwrap_or(0).max(0) as usize;
-
-    match type_name {
-        "TP_DOOR" => {
-            let frame_num = (frame % 5) + 1;
-            Some(("art/door.spe", format!("door{frame_num:04}.pcx")))
-        }
-        "SWITCH_DOOR" => {
-            let frame_num = match state_name {
-                "stopped" => 6,
-                "blocking" => 1,
-                "running" => 6usize.saturating_sub(frame % 6),
-                "walking" => (frame % 6) + 1,
-                _ => 1,
-            };
-            Some(("art/chars/door.spe", format!("door{frame_num:04}.pcx")))
-        }
-        "TP_DOOR_INVIS" => Some(("art/misc.spe", "clone_icon".to_string())),
-        "NEXT_LEVEL" => Some(("art/misc.spe", "end_port2".to_string())),
-        "NEXT_LEVEL_TOP" => Some(("art/misc.spe", "end_port1".to_string())),
-        "TELE_BEAM" => {
-            let frame_num = ((frame % 5) + 1) as u32;
-            Some(("art/chars/teleport.spe", format!("beam{frame_num:04}.pcx")))
-        }
-        "SPRING" => {
-            if state_name == "running" {
-                Some(("art/misc.spe", "spri0001.pcx".to_string()))
-            } else {
-                Some(("art/misc.spe", "spri0004.pcx".to_string()))
-            }
-        }
-        "LAVA" => {
-            let frame_num = ((frame % 15) + 1) as u32;
-            Some(("art/chars/lava.spe", format!("lava{frame_num:04}.pcx")))
-        }
-        "HEALTH" => Some(("art/ball.spe", "heart".to_string())),
-        "POWER_FAST" => Some(("art/misc.spe", "fast".to_string())),
-        "POWER_FLY" => Some(("art/misc.spe", "fly".to_string())),
-        "POWER_SNEAKY" => Some(("art/misc.spe", "sneaky".to_string())),
-        "POWER_HEALTH" => Some(("art/misc.spe", "b_check".to_string())),
-        "COMPASS" => Some(("art/compass.spe", "compass".to_string())),
-        "WHO" => {
-            let entry = match state_name {
-                "turn_around" => format!("wtrn{:04}.pcx", (frame % 9) + 1),
-                _ => format!("wgo{:04}.pcx", (frame % 3) + 1),
-            };
-            Some(("art/rob2.spe", entry))
-        }
-        "FORCE_FIELD" => Some(("art/misc.spe", "force_field".to_string())),
-        "LIGHTIN" => {
-            let frame_num = ((frame % 9) + 1) as u32;
-            Some(("art/chars/lightin.spe", format!("lite{frame_num:04}.pcx")))
-        }
-        "TRAP_DOOR2" => {
-            let frame_num = match state_name {
-                "stopped" => 1,
-                "blocking" => 7,
-                "running" => (frame % 7) + 1,
-                "walking" => 7usize.saturating_sub(frame % 7),
-                _ => 1,
-            };
-            Some(("art/chars/tdoor.spe", format!("tdor{frame_num:04}.pcx")))
-        }
-        "TRAP_DOOR3" => {
-            let frame_num = match state_name {
-                "stopped" => 1,
-                "blocking" => 7,
-                "running" => (frame % 7) + 1,
-                "walking" => 7usize.saturating_sub(frame % 7),
-                _ => 1,
-            };
-            Some(("art/chars/tdoor.spe", format!("cdor{frame_num:04}.pcx")))
-        }
-        "TELE2" => {
-            if state_name == "running" {
-                let frame_num = ((frame % 15) + 1) as u32;
-                Some(("art/chars/teleport.spe", format!("elec{frame_num:04}.pcx")))
-            } else {
-                Some(("art/chars/teleport.spe", "close".to_string()))
-            }
-        }
-        "STEP" => {
-            if state_name == "stopped" {
-                Some(("art/chars/step.spe", "step".to_string()))
-            } else {
-                Some(("art/chars/step.spe", "step_gone".to_string()))
-            }
-        }
-        "SWITCH" | "SWITCH_ONCE" | "SWITCH_DELAY" => {
-            let frame_num = ((frame % 18) + 1) as u32;
-            Some(("art/misc.spe", format!("swit{frame_num:04}.pcx")))
-        }
-        "SWITCH_BALL" => {
-            let frame_num = if state_name == "running" {
-                10 + (frame % 9)
-            } else {
-                1 + (frame % 9)
-            };
-            Some(("art/misc.spe", format!("swit{frame_num:04}.pcx")))
-        }
-        _ => None,
-    }
-}
-
 fn fit_camera_to_level(
     window: &Window,
     level_width: f32,
@@ -718,47 +419,6 @@ fn update_hud(
     );
 }
 
-fn toggle_audio(keyboard: Res<ButtonInput<KeyCode>>, mut audio_state: ResMut<AudioState>) {
-    if keyboard.just_pressed(KeyCode::KeyM) {
-        audio_state.enabled = !audio_state.enabled;
-    }
-}
-
-fn adjust_audio_volume(keyboard: Res<ButtonInput<KeyCode>>, mut audio_state: ResMut<AudioState>) {
-    let mut changed = false;
-    if keyboard.just_pressed(KeyCode::Minus) || keyboard.just_pressed(KeyCode::NumpadSubtract) {
-        audio_state.volume = (audio_state.volume - 0.05).clamp(0.0, 1.0);
-        changed = true;
-    }
-    if keyboard.just_pressed(KeyCode::Equal) || keyboard.just_pressed(KeyCode::NumpadAdd) {
-        audio_state.volume = (audio_state.volume + 0.05).clamp(0.0, 1.0);
-        changed = true;
-    }
-
-    if changed && audio_state.volume <= 0.0 {
-        audio_state.enabled = false;
-    } else if changed {
-        audio_state.enabled = true;
-    }
-}
-
-fn sync_audio_volume(
-    audio_state: Res<AudioState>,
-    mut oneshots: Query<&mut AudioSink, With<OneShotAudio>>,
-) {
-    if !audio_state.is_changed() {
-        return;
-    }
-
-    for mut sink in &mut oneshots {
-        sink.set_volume(if audio_state.enabled {
-            Volume::Linear((audio_state.volume * 0.5).clamp(0.0, 1.0))
-        } else {
-            Volume::SILENT
-        });
-    }
-}
-
 fn toggle_hud_visibility(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut hud_state: ResMut<HudState>,
@@ -786,236 +446,4 @@ fn tile_color(tile: u16, foreground: bool) -> Color {
     } else {
         Color::srgba(tone * 0.35, tone * 0.4, tone * 0.5, 0.35)
     }
-}
-
-fn load_legacy_tile_set(
-    level_path: &Path,
-    images: &mut Assets<Image>,
-) -> Result<LegacyTileSet, String> {
-    let data_root = level_path
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| format!("could not derive data root from {}", level_path.display()))?;
-
-    let palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
-
-    let mut fg_tiles = HashMap::new();
-    let mut bg_tiles = HashMap::new();
-    let mut fg_tile_size = Vec2::new(FG_TILE_SIZE, FG_TILE_SIZE);
-    let mut bg_tile_size = Vec2::new(FG_TILE_SIZE, FG_TILE_SIZE);
-
-    for rel_path in FG_TILE_SPE_FILES {
-        let path = data_root.join(rel_path);
-        if !path.exists() {
-            continue;
-        }
-        let loaded = read_tile_images_from_spe(&path, SpecType::ForeTile, &palette)?;
-        for (tile_id, rgba, width, height) in loaded {
-            fg_tile_size = Vec2::new(width as f32, height as f32);
-            let texture = image_from_rgba(width, height, rgba);
-            fg_tiles.insert(tile_id, images.add(texture));
-        }
-    }
-
-    for rel_path in BG_TILE_SPE_FILES {
-        let path = data_root.join(rel_path);
-        if !path.exists() {
-            continue;
-        }
-        let loaded = read_tile_images_from_spe(&path, SpecType::BackTile, &palette)?;
-        for (tile_id, rgba, width, height) in loaded {
-            bg_tile_size = Vec2::new(width as f32, height as f32);
-            let texture = image_from_rgba(width, height, rgba);
-            bg_tiles.insert(tile_id, images.add(texture));
-        }
-    }
-
-    if fg_tiles.is_empty() && bg_tiles.is_empty() {
-        return Err("no foreground/background tile textures found".to_string());
-    }
-
-    Ok(LegacyTileSet {
-        fg_tiles,
-        bg_tiles,
-        fg_tile_size,
-        bg_tile_size,
-    })
-}
-
-fn load_object_sprite_library(
-    level_path: &Path,
-    images: &mut Assets<Image>,
-) -> Result<ObjectSpriteLibrary, String> {
-    let data_root = level_path
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| format!("could not derive data root from {}", level_path.display()))?;
-    let fallback_palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
-
-    let mut sprites = HashMap::new();
-    for rel in OBJECT_SPE_FILES {
-        let path = data_root.join(rel);
-        if !path.exists() {
-            continue;
-        }
-
-        let directory = SpeDirectory::open_lenient(&path).map_err(|err| err.to_string())?;
-        let palette = read_palette(&path).unwrap_or_else(|_| fallback_palette.clone());
-        let mut file = File::open(&path).map_err(|err| err.to_string())?;
-
-        for entry in directory.entries.iter().filter(|entry| {
-            matches!(
-                entry.spec_type,
-                SpecType::Image | SpecType::Character | SpecType::Character2
-            )
-        }) {
-            let (rgba, width, height) = read_image_entry(&mut file, entry.offset, &palette)?;
-            let handle = images.add(image_from_rgba(width, height, rgba));
-            sprites.insert(
-                (rel.to_ascii_lowercase(), entry.name.to_ascii_lowercase()),
-                handle,
-            );
-        }
-    }
-
-    Ok(ObjectSpriteLibrary { sprites })
-}
-
-fn read_palette(path: &Path) -> Result<Vec<[u8; 3]>, String> {
-    let directory = SpeDirectory::open_lenient(path).map_err(|err| err.to_string())?;
-    let palette_entry = directory
-        .entries
-        .iter()
-        .find(|e| e.spec_type == SpecType::Palette && e.name == "palette")
-        .or_else(|| {
-            directory
-                .entries
-                .iter()
-                .find(|e| e.spec_type == SpecType::Palette)
-        })
-        .ok_or_else(|| format!("no palette entry in {}", path.display()))?;
-
-    let mut file = File::open(path).map_err(|err| err.to_string())?;
-    file.seek(SeekFrom::Start(u64::from(palette_entry.offset)))
-        .map_err(|err| err.to_string())?;
-
-    let count = file
-        .read_u16::<LittleEndian>()
-        .map_err(|err| err.to_string())? as usize;
-
-    let mut colors = Vec::with_capacity(count);
-    let mut max_component = 0_u8;
-    for _ in 0..count {
-        let r = file.read_u8().map_err(|err| err.to_string())?;
-        let g = file.read_u8().map_err(|err| err.to_string())?;
-        let b = file.read_u8().map_err(|err| err.to_string())?;
-        max_component = max_component.max(r).max(g).max(b);
-        colors.push([r, g, b]);
-    }
-
-    if max_component <= 63 {
-        for color in &mut colors {
-            color[0] = color[0].saturating_mul(4);
-            color[1] = color[1].saturating_mul(4);
-            color[2] = color[2].saturating_mul(4);
-        }
-    }
-
-    Ok(colors)
-}
-
-fn read_tile_images_from_spe(
-    path: &Path,
-    tile_type: SpecType,
-    palette: &[[u8; 3]],
-) -> Result<Vec<(u16, Vec<u8>, u32, u32)>, String> {
-    let directory = SpeDirectory::open_lenient(path).map_err(|err| err.to_string())?;
-    let mut file = File::open(path).map_err(|err| err.to_string())?;
-
-    let mut out = Vec::new();
-    for entry in directory
-        .entries
-        .iter()
-        .filter(|entry| entry.spec_type == tile_type)
-    {
-        let Ok(tile_id) = entry.name.parse::<u16>() else {
-            continue;
-        };
-
-        let (rgba, width, height) = read_image_entry(&mut file, entry.offset, palette)?;
-        out.push((tile_id, rgba, width, height));
-    }
-
-    Ok(out)
-}
-
-fn read_image_entry(
-    file: &mut File,
-    offset: u32,
-    palette: &[[u8; 3]],
-) -> Result<(Vec<u8>, u32, u32), String> {
-    file.seek(SeekFrom::Start(u64::from(offset)))
-        .map_err(|err| err.to_string())?;
-
-    let width = file
-        .read_u16::<LittleEndian>()
-        .map_err(|err| err.to_string())? as u32;
-    let height = file
-        .read_u16::<LittleEndian>()
-        .map_err(|err| err.to_string())? as u32;
-    let pixel_count = usize::try_from(width.saturating_mul(height))
-        .map_err(|_| format!("image too large: {}x{}", width, height))?;
-
-    let mut indexed = vec![0_u8; pixel_count];
-    file.read_exact(&mut indexed)
-        .map_err(|err| err.to_string())?;
-
-    let mut rgba = vec![0_u8; pixel_count * 4];
-    for (i, idx) in indexed.into_iter().enumerate() {
-        let color = palette.get(idx as usize).copied().unwrap_or([0, 0, 0]);
-        let base = i * 4;
-        rgba[base] = color[0];
-        rgba[base + 1] = color[1];
-        rgba[base + 2] = color[2];
-        rgba[base + 3] = if idx == 0 { 0 } else { 255 };
-    }
-
-    Ok((rgba, width, height))
-}
-
-fn image_from_rgba(width: u32, height: u32, rgba: Vec<u8>) -> Image {
-    Image::new(
-        Extent3d {
-            width,
-            height,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        rgba,
-        TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
-    )
-}
-
-fn make_radial_glow_texture(size: u32) -> Image {
-    let mut rgba = vec![0_u8; (size * size * 4) as usize];
-    let c = size as f32 * 0.5;
-    let max_r = c - 1.0;
-
-    for y in 0..size {
-        for x in 0..size {
-            let dx = x as f32 - c;
-            let dy = y as f32 - c;
-            let dist = (dx * dx + dy * dy).sqrt();
-            let t = (1.0 - dist / max_r).clamp(0.0, 1.0);
-            let a = (t * t * 255.0) as u8;
-            let i = ((y * size + x) * 4) as usize;
-            rgba[i] = 255;
-            rgba[i + 1] = 255;
-            rgba[i + 2] = 255;
-            rgba[i + 3] = a;
-        }
-    }
-
-    image_from_rgba(size, size, rgba)
 }

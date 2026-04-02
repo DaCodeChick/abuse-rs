@@ -77,6 +77,13 @@ Acceptance:
 - `crates/game`: executable wiring and configuration.
 - `crates/tools`: inspection and conversion tools.
 
+Viewer runtime split status:
+
+- [x] Moved viewer asset decoding and texture loading into `crates/runtime/src/viewer/assets.rs`
+- [x] Moved object sprite mapping into `crates/runtime/src/viewer/object_render.rs`
+- [x] Moved object-driven SFX systems into `crates/runtime/src/viewer/audio.rs`
+- [x] Switched `SpecType` conversion to `TryFrom<u8>`
+
 ## References
 
 - Legacy source root: local path provided at runtime
