@@ -1,0 +1,204 @@
+{
+  "name": "/home/admin/Downloads/abuse-0.8/data/levels/frabs13.spe",
+  "first_name": "levels/level13.spe",
+  "foreground": {
+    "width": 90,
+    "height": 150,
+    "tile_count": 13500,
+    "tile_sample": [
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28
+    ]
+  },
+  "background": {
+    "width": 30,
+    "height": 45,
+    "tile_count": 1350,
+    "tile_sample": [
+      35,
+      14,
+      17,
+      20,
+      23,
+      26,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "bg_scroll_rate": {
+    "xmul": 1,
+    "xdiv": 100,
+    "ymul": 1,
+    "ydiv": 100
+  },
+  "objects": {
+    "object_count": 158,
+    "objects_loaded": 158,
+    "type_names_count": 282,
+    "state_names_count": 282,
+    "object_sample": [
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 2161,
+        "y": 851,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 1845,
+        "y": 341,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 1592,
+        "y": 176,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 973,
+        "y": 169,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 8,
+        "state_id": 0,
+        "type_name": "GATE_AND",
+        "state_name": "stopped",
+        "x": 2102,
+        "y": 1333,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 62,
+        "state_id": 0,
+        "type_name": "NEXT_LEVEL",
+        "state_name": "stopped",
+        "x": 1954,
+        "y": 1433,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 148,
+        "state_id": 0,
+        "type_name": "SENSOR",
+        "state_name": "stopped",
+        "x": 778,
+        "y": 1337,
+        "hp": 0,
+        "lvars_count": 1
+      },
+      {
+        "type_id": 22,
+        "state_id": 0,
+        "type_name": "TELE2",
+        "state_name": "stopped",
+        "x": 623,
+        "y": 1321,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 1,
+        "state_id": 0,
+        "type_name": "OBJ_MOVER",
+        "state_name": "stopped",
+        "x": 926,
+        "y": 1278,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 1,
+        "state_id": 0,
+        "type_name": "OBJ_MOVER",
+        "state_name": "stopped",
+        "x": 1024,
+        "y": 1268,
+        "hp": 6,
+        "lvars_count": 0
+      }
+    ]
+  },
+  "lights": {
+    "min_light_level": 35,
+    "lights_count": 0,
+    "light_sample": []
+  },
+  "links": {
+    "object_links_count": 123,
+    "light_links_count": 0,
+    "object_link_sample": [
+      {
+        "from_object": 5,
+        "to_object": 53
+      },
+      {
+        "from_object": 5,
+        "to_object": 1
+      },
+      {
+        "from_object": 5,
+        "to_object": 2
+      },
+      {
+        "from_object": 5,
+        "to_object": 3
+      },
+      {
+        "from_object": 5,
+        "to_object": 4
+      },
+      {
+        "from_object": 8,
+        "to_object": 134
+      },
+      {
+        "from_object": 10,
+        "to_object": 9
+      },
+      {
+        "from_object": 11,
+        "to_object": 10
+      },
+      {
+        "from_object": 12,
+        "to_object": 11
+      },
+      {
+        "from_object": 13,
+        "to_object": 12
+      }
+    ],
+    "light_link_sample": []
+  }
+}

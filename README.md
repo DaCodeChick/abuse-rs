@@ -114,6 +114,23 @@ cargo run -p abuse-tools -- level-dump /path/to/levels/level00.spe --format ron
 This outputs a structured, machine-comparable dump of the level data in JSON or RON format
 (default is JSON). Useful for validation against legacy level parsing.
 
+## Testing
+
+Run all tests:
+
+```bash
+cargo test --workspace
+```
+
+Level parsing baseline validation tests are available when `ABUSE_LEGACY_ROOT` is set:
+
+```bash
+ABUSE_LEGACY_ROOT=/path/to/abuse-0.8 cargo test -p abuse-runtime --test level_baselines
+```
+
+These tests validate the level parser against 49 baseline dumps of real legacy levels
+(22 main campaign + 27 Frabs addon levels). See `tests/baselines/README.md` for details.
+
 ## Non-Goals (for now)
 
 - Full editor parity

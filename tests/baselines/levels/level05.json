@@ -1,0 +1,320 @@
+{
+  "name": "/home/admin/Downloads/abuse-0.8/data/levels/level05.spe",
+  "first_name": "C:\\ABUSE\\LEVELS/LEVEL05.SPE",
+  "foreground": {
+    "width": 150,
+    "height": 150,
+    "tile_count": 22500,
+    "tile_sample": [
+      34,
+      389,
+      335,
+      335,
+      389,
+      33,
+      28,
+      28,
+      28,
+      28
+    ]
+  },
+  "background": {
+    "width": 45,
+    "height": 45,
+    "tile_count": 2025,
+    "tile_sample": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "bg_scroll_rate": {
+    "xmul": 5,
+    "xdiv": 8,
+    "ymul": 1,
+    "ydiv": 1
+  },
+  "objects": {
+    "object_count": 410,
+    "objects_loaded": 410,
+    "type_names_count": 151,
+    "state_names_count": 151,
+    "object_sample": [
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 177,
+        "y": 1384,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1215,
+        "y": 758,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 2385,
+        "y": 1101,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1052,
+        "y": 310,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1172,
+        "y": 312,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 2490,
+        "y": 276,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 508,
+        "y": 655,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 183,
+        "y": 539,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1114,
+        "y": 1179,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 1275,
+        "y": 631,
+        "hp": 6,
+        "lvars_count": 0
+      }
+    ]
+  },
+  "lights": {
+    "min_light_level": 35,
+    "lights_count": 138,
+    "light_sample": [
+      {
+        "light_type": 1,
+        "x": 1618,
+        "y": 637,
+        "xshift": 0,
+        "yshift": 1,
+        "inner_radius": 1,
+        "outer_radius": 100
+      },
+      {
+        "light_type": 0,
+        "x": 1297,
+        "y": 623,
+        "xshift": 0,
+        "yshift": 1,
+        "inner_radius": 1,
+        "outer_radius": 174
+      },
+      {
+        "light_type": 0,
+        "x": 2562,
+        "y": 863,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 114
+      },
+      {
+        "light_type": 1,
+        "x": 2217,
+        "y": 714,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 100
+      },
+      {
+        "light_type": 1,
+        "x": 2546,
+        "y": 712,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 100
+      },
+      {
+        "light_type": 0,
+        "x": 2156,
+        "y": 989,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 159
+      },
+      {
+        "light_type": 3,
+        "x": 950,
+        "y": 851,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 84
+      },
+      {
+        "light_type": 4,
+        "x": 998,
+        "y": 968,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 61
+      },
+      {
+        "light_type": 1,
+        "x": 1650,
+        "y": 982,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 144
+      },
+      {
+        "light_type": 1,
+        "x": 887,
+        "y": 351,
+        "xshift": 1,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 176
+      }
+    ]
+  },
+  "links": {
+    "object_links_count": 273,
+    "light_links_count": 6,
+    "object_link_sample": [
+      {
+        "from_object": 10,
+        "to_object": 293
+      },
+      {
+        "from_object": 10,
+        "to_object": 292
+      },
+      {
+        "from_object": 10,
+        "to_object": 294
+      },
+      {
+        "from_object": 10,
+        "to_object": 295
+      },
+      {
+        "from_object": 10,
+        "to_object": 296
+      },
+      {
+        "from_object": 10,
+        "to_object": 299
+      },
+      {
+        "from_object": 10,
+        "to_object": 298
+      },
+      {
+        "from_object": 10,
+        "to_object": 297
+      },
+      {
+        "from_object": 11,
+        "to_object": 219
+      },
+      {
+        "from_object": 12,
+        "to_object": 18
+      }
+    ],
+    "light_link_sample": [
+      {
+        "from_object": 60,
+        "to_light": 10
+      },
+      {
+        "from_object": 213,
+        "to_light": 65
+      },
+      {
+        "from_object": 214,
+        "to_light": 64
+      },
+      {
+        "from_object": 215,
+        "to_light": 63
+      },
+      {
+        "from_object": 222,
+        "to_light": 92
+      },
+      {
+        "from_object": 237,
+        "to_light": 103
+      }
+    ]
+  }
+}

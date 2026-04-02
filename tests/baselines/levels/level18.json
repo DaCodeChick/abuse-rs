@@ -1,0 +1,300 @@
+{
+  "name": "/home/admin/Downloads/abuse-0.8/data/levels/level18.spe",
+  "first_name": "levels/level18.spe",
+  "foreground": {
+    "width": 175,
+    "height": 120,
+    "tile_count": 21000,
+    "tile_sample": [
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28,
+      28
+    ]
+  },
+  "background": {
+    "width": 51,
+    "height": 38,
+    "tile_count": 1938,
+    "tile_sample": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "bg_scroll_rate": {
+    "xmul": 5,
+    "xdiv": 8,
+    "ymul": 1,
+    "ydiv": 1
+  },
+  "objects": {
+    "object_count": 345,
+    "objects_loaded": 345,
+    "type_names_count": 151,
+    "state_names_count": 151,
+    "object_sample": [
+      {
+        "type_id": 145,
+        "state_id": 0,
+        "type_name": "SWITCH_ONCE",
+        "state_name": "stopped",
+        "x": 3386,
+        "y": 1140,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 144,
+        "state_id": 0,
+        "type_name": "SWITCH",
+        "state_name": "stopped",
+        "x": 90,
+        "y": 779,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 126,
+        "state_id": 0,
+        "type_name": "SWITCH_DOOR",
+        "state_name": "stopped",
+        "x": 4320,
+        "y": 1229,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1094,
+        "y": 534,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 2840,
+        "y": 352,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1160,
+        "y": 774,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 61,
+        "state_id": 0,
+        "type_name": "RESTART_POSITION",
+        "state_name": "stopped",
+        "x": 1032,
+        "y": 112,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 62,
+        "state_id": 0,
+        "type_name": "NEXT_LEVEL",
+        "state_name": "stopped",
+        "x": 4905,
+        "y": 1446,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 64,
+        "state_id": 0,
+        "type_name": "TELE_BEAM",
+        "state_name": "stopped",
+        "x": 4902,
+        "y": 1439,
+        "hp": 6,
+        "lvars_count": 0
+      },
+      {
+        "type_id": 5,
+        "state_id": 0,
+        "type_name": "AMBIENT_SOUND",
+        "state_name": "stopped",
+        "x": 4839,
+        "y": 1423,
+        "hp": 6,
+        "lvars_count": 0
+      }
+    ]
+  },
+  "lights": {
+    "min_light_level": 35,
+    "lights_count": 43,
+    "light_sample": [
+      {
+        "light_type": 7,
+        "x": 4965,
+        "y": 1049,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 400
+      },
+      {
+        "light_type": 1,
+        "x": 4154,
+        "y": 1223,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 100
+      },
+      {
+        "light_type": 3,
+        "x": 4185,
+        "y": 1126,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 196
+      },
+      {
+        "light_type": 4,
+        "x": 4116,
+        "y": 1122,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 196
+      },
+      {
+        "light_type": 2,
+        "x": 3637,
+        "y": 1050,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 158
+      },
+      {
+        "light_type": 0,
+        "x": 3286,
+        "y": 1106,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 138
+      },
+      {
+        "light_type": 0,
+        "x": 4155,
+        "y": 1001,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 86
+      },
+      {
+        "light_type": 0,
+        "x": 3013,
+        "y": 244,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 100
+      },
+      {
+        "light_type": 2,
+        "x": 3821,
+        "y": 207,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 192
+      },
+      {
+        "light_type": 2,
+        "x": 2265,
+        "y": 1076,
+        "xshift": 0,
+        "yshift": 0,
+        "inner_radius": 1,
+        "outer_radius": 100
+      }
+    ]
+  },
+  "links": {
+    "object_links_count": 466,
+    "light_links_count": 1,
+    "object_link_sample": [
+      {
+        "from_object": 1,
+        "to_object": 59
+      },
+      {
+        "from_object": 1,
+        "to_object": 65
+      },
+      {
+        "from_object": 1,
+        "to_object": 61
+      },
+      {
+        "from_object": 1,
+        "to_object": 60
+      },
+      {
+        "from_object": 3,
+        "to_object": 67
+      },
+      {
+        "from_object": 8,
+        "to_object": 55
+      },
+      {
+        "from_object": 11,
+        "to_object": 87
+      },
+      {
+        "from_object": 12,
+        "to_object": 87
+      },
+      {
+        "from_object": 13,
+        "to_object": 87
+      },
+      {
+        "from_object": 14,
+        "to_object": 87
+      }
+    ],
+    "light_link_sample": [
+      {
+        "from_object": 27,
+        "to_light": 27
+      }
+    ]
+  }
+}
