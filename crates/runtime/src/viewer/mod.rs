@@ -7,7 +7,6 @@
 pub mod assets;
 pub mod audio;
 pub mod camera;
-pub mod constants;
 pub mod hud;
 pub mod object_render;
 pub mod scene;

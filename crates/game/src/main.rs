@@ -16,11 +16,13 @@ use abuse_runtime::viewer::audio::{
 use abuse_runtime::viewer::camera::{
     LevelViewBounds, ViewerCamera, camera_controls, fit_camera_to_level, setup_camera,
 };
-use abuse_runtime::viewer::constants::FG_TILE_SIZE;
 use abuse_runtime::viewer::hud::{HudState, spawn_hud, toggle_hud_visibility, update_hud};
 use abuse_runtime::viewer::scene::{spawn_bg_tiles, spawn_fg_tiles, spawn_lights, spawn_objects};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+
+/// Default fallback tile size used when archive tile dimensions are unknown.
+const FG_TILE_SIZE: f32 = 32.0;
 
 /// Foreground tile archives loaded in order for tile lookup.
 const FG_TILE_SPE_FILES: &[&str] = &[
