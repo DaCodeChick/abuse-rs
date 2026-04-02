@@ -5,3 +5,6 @@ edition.workspace = true
 
 [dependencies]
 abuse-runtime = { path = "../runtime" }
+ron = "0.12.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"

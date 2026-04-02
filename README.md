@@ -31,10 +31,12 @@ This repository is currently in bootstrap phase:
 
 Viewer implementation is split into runtime modules under `crates/runtime/src/viewer`:
 
-- `constants.rs`: tile/object archive lists and shared constants
 - `assets.rs`: legacy SPE palette/image decoding and texture library loading
 - `object_render.rs`: object type/state/frame -> sprite mapping + placement offsets
 - `audio.rs`: object-driven one-shot SFX state and control systems
+- `camera.rs`: viewport/pan/zoom control
+- `hud.rs`: debug overlay and information display
+- `scene.rs`: level scene setup and world state initialization
 
 This keeps `crates/game/src/main.rs` focused on app composition and scene wiring.
 
@@ -85,6 +87,32 @@ cargo run -p abuse-tools -- lisp-loads /path/to/abuse.lsp
 ```
 
 This parses a Lisp file and lists the discovered `(load "...")` dependencies.
+
+SPE file inspection:
+
+```bash
+cargo run -p abuse-tools -- spe-list /path/to/file.spe
+```
+
+This lists all entries in an SPE archive with type, flags, size, offset, and name.
+
+Level summary:
+
+```bash
+cargo run -p abuse-tools -- level-summary /path/to/levels/level00.spe
+```
+
+This displays a human-readable summary of level dimensions, object counts, lights, and links.
+
+Level dump for validation:
+
+```bash
+cargo run -p abuse-tools -- level-dump /path/to/levels/level00.spe --format json
+cargo run -p abuse-tools -- level-dump /path/to/levels/level00.spe --format ron
+```
+
+This outputs a structured, machine-comparable dump of the level data in JSON or RON format
+(default is JSON). Useful for validation against legacy level parsing.
 
 ## Non-Goals (for now)
 

@@ -3,6 +3,100 @@ use std::path::PathBuf;
 use abuse_runtime::data::level::{LevelData, VAR_HP, VAR_X, VAR_Y};
 use abuse_runtime::data::lisp::LispProgram;
 use abuse_runtime::data::spe::SpeDirectory;
+use serde::Serialize;
+
+/// Serializable level dump structure for stable machine-comparable output.
+#[derive(Debug, Serialize)]
+struct LevelDump {
+    name: String,
+    first_name: Option<String>,
+    foreground: MapDump,
+    background: MapDump,
+    bg_scroll_rate: BgScrollRate,
+    objects: ObjectsDump,
+    lights: LightsDump,
+    links: LinksDump,
+}
+
+#[derive(Debug, Serialize)]
+struct MapDump {
+    width: u32,
+    height: u32,
+    tile_count: usize,
+    /// Sample of first few tiles for validation
+    tile_sample: Vec<u16>,
+}
+
+#[derive(Debug, Serialize)]
+struct BgScrollRate {
+    xmul: u32,
+    xdiv: u32,
+    ymul: u32,
+    ydiv: u32,
+}
+
+#[derive(Debug, Serialize)]
+struct ObjectsDump {
+    object_count: Option<u32>,
+    objects_loaded: usize,
+    type_names_count: usize,
+    state_names_count: usize,
+    /// Sample of first few objects for validation
+    object_sample: Vec<ObjectDump>,
+}
+
+#[derive(Debug, Serialize)]
+struct ObjectDump {
+    type_id: u16,
+    state_id: u16,
+    type_name: Option<String>,
+    state_name: Option<String>,
+    x: i32,
+    y: i32,
+    hp: i32,
+    lvars_count: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct LightsDump {
+    min_light_level: Option<u32>,
+    lights_count: usize,
+    /// Sample of first few lights for validation
+    light_sample: Vec<LightDump>,
+}
+
+#[derive(Debug, Serialize)]
+struct LightDump {
+    light_type: u8,
+    x: i32,
+    y: i32,
+    xshift: i32,
+    yshift: i32,
+    inner_radius: i32,
+    outer_radius: i32,
+}
+
+#[derive(Debug, Serialize)]
+struct LinksDump {
+    object_links_count: usize,
+    light_links_count: usize,
+    /// Sample of first few object links for validation
+    object_link_sample: Vec<ObjectLinkDump>,
+    /// Sample of first few light links for validation
+    light_link_sample: Vec<LightLinkDump>,
+}
+
+#[derive(Debug, Serialize)]
+struct ObjectLinkDump {
+    from_object: i32,
+    to_object: i32,
+}
+
+#[derive(Debug, Serialize)]
+struct LightLinkDump {
+    from_object: i32,
+    to_light: i32,
+}
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -158,6 +252,51 @@ fn main() {
                 }
             }
         }
+        "level-dump" => {
+            let path = if args.len() >= 3 {
+                PathBuf::from(&args[2])
+            } else {
+                eprintln!("error: missing path to level spe file");
+                print_usage();
+                std::process::exit(2);
+            };
+
+            let format = if args.len() >= 5 && args[3] == "--format" {
+                args[4].as_str()
+            } else {
+                "json"
+            };
+
+            match LevelData::open(&path) {
+                Ok(level) => {
+                    let dump = create_level_dump(&level);
+                    match format {
+                        "json" => match serde_json::to_string_pretty(&dump) {
+                            Ok(json) => println!("{json}"),
+                            Err(err) => {
+                                eprintln!("error: failed to serialize to JSON: {err}");
+                                std::process::exit(1);
+                            }
+                        },
+                        "ron" => match ron::ser::to_string_pretty(&dump, Default::default()) {
+                            Ok(ron_str) => println!("{ron_str}"),
+                            Err(err) => {
+                                eprintln!("error: failed to serialize to RON: {err}");
+                                std::process::exit(1);
+                            }
+                        },
+                        _ => {
+                            eprintln!("error: unsupported format '{format}' (use 'json' or 'ron')");
+                            std::process::exit(2);
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
         _ => print_usage(),
     }
 }
@@ -168,4 +307,103 @@ fn print_usage() {
     println!("  abuse-tools lisp-loads <path-to-lisp-file>");
     println!("  abuse-tools spe-list <path-to-spe-file>");
     println!("  abuse-tools level-summary <path-to-level-spe>");
+    println!("  abuse-tools level-dump <path-to-level-spe> [--format json|ron]");
+}
+
+/// Creates a serializable level dump from a LevelData instance.
+/// Includes counts and representative samples for validation and comparison.
+fn create_level_dump(level: &LevelData) -> LevelDump {
+    const SAMPLE_SIZE: usize = 10;
+
+    let object_sample = level
+        .objects
+        .iter()
+        .take(SAMPLE_SIZE)
+        .map(|obj| ObjectDump {
+            type_id: obj.type_id,
+            state_id: obj.state_id,
+            type_name: obj.type_name.clone(),
+            state_name: obj.state_name.clone(),
+            x: obj.var(VAR_X).unwrap_or(0),
+            y: obj.var(VAR_Y).unwrap_or(0),
+            hp: obj.var(VAR_HP).unwrap_or(0),
+            lvars_count: obj.lvars.len(),
+        })
+        .collect();
+
+    let light_sample = level
+        .lights
+        .iter()
+        .take(SAMPLE_SIZE)
+        .map(|light| LightDump {
+            light_type: light.light_type,
+            x: light.x,
+            y: light.y,
+            xshift: light.xshift,
+            yshift: light.yshift,
+            inner_radius: light.inner_radius,
+            outer_radius: light.outer_radius,
+        })
+        .collect();
+
+    let object_link_sample = level
+        .object_links
+        .iter()
+        .take(SAMPLE_SIZE)
+        .map(|link| ObjectLinkDump {
+            from_object: link.from_object,
+            to_object: link.to_object,
+        })
+        .collect();
+
+    let light_link_sample = level
+        .light_links
+        .iter()
+        .take(SAMPLE_SIZE)
+        .map(|link| LightLinkDump {
+            from_object: link.from_object,
+            to_light: link.to_light,
+        })
+        .collect();
+
+    LevelDump {
+        name: level.name.clone(),
+        first_name: level.first_name.clone(),
+        foreground: MapDump {
+            width: level.fg_width,
+            height: level.fg_height,
+            tile_count: level.fg_tiles.len(),
+            tile_sample: level.fg_tiles.iter().take(SAMPLE_SIZE).copied().collect(),
+        },
+        background: MapDump {
+            width: level.bg_width,
+            height: level.bg_height,
+            tile_count: level.bg_tiles.len(),
+            tile_sample: level.bg_tiles.iter().take(SAMPLE_SIZE).copied().collect(),
+        },
+        bg_scroll_rate: BgScrollRate {
+            xmul: level.bg_xmul,
+            xdiv: level.bg_xdiv,
+            ymul: level.bg_ymul,
+            ydiv: level.bg_ydiv,
+        },
+        objects: ObjectsDump {
+            object_count: level.object_count,
+            objects_loaded: level.objects.len(),
+            type_names_count: level.object_type_names.len(),
+            state_names_count: level.object_state_names.len(),
+            object_sample,
+        },
+        lights: LightsDump {
+            min_light_level: level.min_light_level,
+            lights_count: level.lights.len(),
+            light_sample,
+        },
+        links: LinksDump {
+            object_links_count: level.object_links.len(),
+            light_links_count: level.light_links.len(),
+            object_link_sample,
+            light_link_sample,
+        },
+    }
 }
