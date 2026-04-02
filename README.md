@@ -54,8 +54,13 @@ Viewer controls:
 - Mouse wheel: zoom
 - `Q` / `E`: zoom out / in
 - `F1`: toggle debug HUD
-- `F2`: toggle object/light debug markers
-- `F3`: toggle environmental object markers
+
+Current object rendering includes a mapped subset (eg `TP_DOOR`, `SWITCH_DOOR`,
+`TRAP_DOOR2/3`, `TELE2`, `FORCE_FIELD`, `LIGHTIN`, `STEP`, basic `SWITCH*`) based on
+level object type/state names and known sprite archives.
+
+Additional mappings now include key level objects like `NEXT_LEVEL`, `SPRING`, `LAVA`,
+powerups (`HEALTH`, `POWER_FAST`, etc.), and `WHO`.
 
 Lisp bootstrap tooling is available:
 

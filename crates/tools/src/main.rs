@@ -108,15 +108,19 @@ fn main() {
                         let y = object.var(VAR_Y).unwrap_or(0);
                         let hp = object.var(VAR_HP).unwrap_or(0);
                         println!(
-                            "  obj[{idx}] type={} state={} x={} y={} hp={} lvars={}",
+                            "  obj[{idx}] type={}({}) state={}({}) x={} y={} hp={} lvars={}",
                             object.type_id,
+                            object.type_name.as_deref().unwrap_or("?"),
                             object.state_id,
+                            object.state_name.as_deref().unwrap_or("?"),
                             x,
                             y,
                             hp,
                             object.lvars.len()
                         );
                     }
+
+                    println!("object_type_names: {}", level.object_type_names.len());
 
                     match level.min_light_level {
                         Some(min_level) => println!("min_light_level: {min_level}"),

@@ -1,14 +1,9 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::{
-    collections::HashMap, collections::HashSet, fs::File, io::Read, io::Seek, io::SeekFrom,
-    path::Path,
-};
+use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 
 use abuse_runtime::AbuseRuntimePlugins;
-use abuse_runtime::data::level::{
-    LevelData, VAR_AITYPE, VAR_HP, VAR_TARGETABLE, VAR_X, VAR_XACEL, VAR_XVEL, VAR_Y, VAR_YACEL,
-    VAR_YVEL,
-};
+use abuse_runtime::data::level::{LevelData, VAR_CUR_FRAME, VAR_X, VAR_Y};
 use abuse_runtime::data::spe::{SpeDirectory, SpecType};
 use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::MouseWheel;
@@ -48,27 +43,30 @@ const BG_TILE_SPE_FILES: &[&str] = &[
     "art/back/galien.spe",
 ];
 
+const OBJECT_SPE_FILES: &[&str] = &[
+    "art/door.spe",
+    "art/chars/door.spe",
+    "art/chars/tdoor.spe",
+    "art/chars/teleport.spe",
+    "art/chars/platform.spe",
+    "art/chars/lightin.spe",
+    "art/chars/lava.spe",
+    "art/chars/step.spe",
+    "art/ball.spe",
+    "art/compass.spe",
+    "art/rob2.spe",
+    "art/misc.spe",
+];
+
 #[derive(Component)]
 struct ViewerCamera;
 
 #[derive(Component)]
 struct ViewerHud;
 
-#[derive(Component)]
-struct DebugMarker;
-
-#[derive(Component)]
-struct DebugEnvironmentMarker;
-
 #[derive(Resource, Debug, Clone, Copy)]
 struct HudState {
     visible: bool,
-}
-
-#[derive(Resource, Debug, Clone, Copy)]
-struct DebugOverlayState {
-    markers_visible: bool,
-    env_visible: bool,
 }
 
 #[derive(Resource, Debug, Clone)]
@@ -82,17 +80,28 @@ struct LevelViewBounds {
     height: f32,
 }
 
-#[derive(Resource, Debug, Clone, Copy)]
-struct EnvironmentStats {
-    count: usize,
-}
-
 #[derive(Debug, Clone)]
 struct LegacyTileSet {
     fg_tiles: HashMap<u16, Handle<Image>>,
     bg_tiles: HashMap<u16, Handle<Image>>,
     fg_tile_size: Vec2,
     bg_tile_size: Vec2,
+}
+
+#[derive(Debug, Clone)]
+struct ObjectSpriteLibrary {
+    sprites: HashMap<(String, String), Handle<Image>>,
+}
+
+impl ObjectSpriteLibrary {
+    fn get(&self, spe_path: &str, entry_name: &str) -> Option<Handle<Image>> {
+        self.sprites
+            .get(&(
+                spe_path.to_ascii_lowercase(),
+                entry_name.to_ascii_lowercase(),
+            ))
+            .cloned()
+    }
 }
 
 fn main() {
@@ -102,22 +111,9 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(ViewerConfig { level_path })
         .insert_resource(HudState { visible: true })
-        .insert_resource(DebugOverlayState {
-            markers_visible: true,
-            env_visible: false,
-        })
         .add_plugins(AbuseRuntimePlugins)
         .add_systems(Startup, (setup_camera, load_level_view).chain())
-        .add_systems(
-            Update,
-            (
-                camera_controls,
-                toggle_hud_visibility,
-                toggle_debug_markers,
-                toggle_environment_markers,
-                update_hud,
-            ),
-        )
+        .add_systems(Update, (camera_controls, toggle_hud_visibility, update_hud))
         .run();
 }
 
@@ -125,7 +121,7 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, ViewerCamera));
 }
 
-fn spawn_hud(commands: &mut Commands, level: &LevelData, env_count: usize) {
+fn spawn_hud(commands: &mut Commands, level: &LevelData) {
     let level_name = std::path::Path::new(&level.name)
         .file_name()
         .and_then(|name| name.to_str())
@@ -133,11 +129,10 @@ fn spawn_hud(commands: &mut Commands, level: &LevelData, env_count: usize) {
 
     commands.spawn((
         Text::new(format!(
-            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\nenv: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers, F3 env",
+            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD",
             level_name,
             level.objects.len(),
             level.lights.len(),
-            env_count,
         )),
         Node {
             position_type: PositionType::Absolute,
@@ -176,6 +171,10 @@ fn load_level_view(
         .inspect_err(|err| warn!("Tile asset loading failed, falling back to debug colors: {err}"))
         .ok();
 
+    let object_sprites = load_object_sprite_library(level_path, &mut images)
+        .inspect_err(|err| warn!("Object sprite library failed to load: {err}"))
+        .ok();
+
     let fg_tile_size = tile_set
         .as_ref()
         .map(|set| set.fg_tile_size)
@@ -191,11 +190,6 @@ fn load_level_view(
     commands.insert_resource(LevelViewBounds {
         width: fg_world_w,
         height: fg_world_h,
-    });
-
-    let env_candidates = collect_environment_candidates(&level);
-    commands.insert_resource(EnvironmentStats {
-        count: env_candidates.len(),
     });
 
     if let (Ok(window), Ok(mut camera_transform)) =
@@ -237,15 +231,14 @@ fn load_level_view(
         for col in 0..level.bg_width as usize {
             let idx = row * level.bg_width as usize + col;
             let tile = level.bg_tiles[idx];
-            let tile_id = tile;
-            if tile_id == 0 {
+            if tile == 0 {
                 continue;
             }
 
             let x = col as f32 * bg_tile_size.x - bg_world_w * 0.5 + bg_tile_size.x * 0.5;
             let y = bg_world_h * 0.5 - row as f32 * bg_tile_size.y - bg_tile_size.y * 0.5;
 
-            if let Some(texture) = tile_set.as_ref().and_then(|set| set.bg_tiles.get(&tile_id)) {
+            if let Some(texture) = tile_set.as_ref().and_then(|set| set.bg_tiles.get(&tile)) {
                 commands.spawn((
                     Sprite {
                         image: texture.clone(),
@@ -256,40 +249,47 @@ fn load_level_view(
                 ));
             } else {
                 commands.spawn((
-                    Sprite::from_color(tile_color(tile_id, false), bg_tile_size),
+                    Sprite::from_color(tile_color(tile, false), bg_tile_size),
                     Transform::from_xyz(x, y, 0.0),
                 ));
             }
         }
     }
 
-    for (index, object) in level.objects.iter().enumerate() {
-        let x = object.var(VAR_X).unwrap_or(0) as f32 - fg_world_w * 0.5;
-        let y = fg_world_h * 0.5 - object.var(VAR_Y).unwrap_or(0) as f32;
-
-        if env_candidates.contains(&(index as i32)) {
-            commands.spawn((
-                Sprite::from_color(Color::srgba(0.2, 0.78, 0.95, 0.9), Vec2::new(12.0, 12.0)),
-                Transform::from_xyz(x, y, 3.6),
-                Visibility::Hidden,
-                DebugEnvironmentMarker,
-            ));
+    if let Some(sprite_lib) = &object_sprites {
+        for object in &level.objects {
+            if let Some((spe_rel, entry_name)) = resolve_object_sprite(object) {
+                if let Some(texture) = sprite_lib.get(spe_rel, &entry_name) {
+                    let x = object.var(VAR_X).unwrap_or(0) as f32 - fg_world_w * 0.5;
+                    let mut y = fg_world_h * 0.5 - object.var(VAR_Y).unwrap_or(0) as f32;
+                    if let Some(image) = images.get(&texture) {
+                        y += image.height() as f32 * 0.5;
+                    }
+                    commands.spawn((Sprite::from_image(texture), Transform::from_xyz(x, y, 2.5)));
+                }
+            }
         }
-
-        commands.spawn((
-            Sprite::from_color(Color::srgba(0.92, 0.28, 0.2, 0.9), Vec2::splat(7.0)),
-            Transform::from_xyz(x, y, 3.0),
-            DebugMarker,
-        ));
     }
 
+    let light_glow = images.add(make_radial_glow_texture(96));
     for light in &level.lights {
         let x = light.x as f32 - fg_world_w * 0.5;
         let y = fg_world_h * 0.5 - light.y as f32;
+        let radius = light.outer_radius.max(8) as f32;
+        let tint = match light.light_type {
+            1 => Color::srgba(0.85, 0.75, 0.45, 0.26),
+            3 => Color::srgba(0.72, 0.45, 0.92, 0.28),
+            _ => Color::srgba(0.8, 0.8, 0.75, 0.2),
+        };
+
         commands.spawn((
-            Sprite::from_color(Color::srgba(1.0, 0.95, 0.25, 0.65), Vec2::splat(10.0)),
-            Transform::from_xyz(x, y, 4.0),
-            DebugMarker,
+            Sprite {
+                image: light_glow.clone(),
+                custom_size: Some(Vec2::splat(radius * 2.0)),
+                color: tint,
+                ..default()
+            },
+            Transform::from_xyz(x, y, 2.2),
         ));
     }
 
@@ -304,7 +304,116 @@ fn load_level_view(
         level.lights.len()
     );
 
-    spawn_hud(&mut commands, &level, env_candidates.len());
+    spawn_hud(&mut commands, &level);
+}
+
+fn resolve_object_sprite(
+    object: &abuse_runtime::data::level::LoadedObject,
+) -> Option<(&'static str, String)> {
+    let type_name = object.type_name.as_deref()?;
+    let state_name = object.state_name.as_deref().unwrap_or("stopped");
+    let frame = object.var(VAR_CUR_FRAME).unwrap_or(0).max(0) as usize;
+
+    match type_name {
+        "TP_DOOR" => {
+            let frame_num = (frame % 5) + 1;
+            Some(("art/door.spe", format!("door{frame_num:04}.pcx")))
+        }
+        "SWITCH_DOOR" => {
+            let frame_num = match state_name {
+                "stopped" => 6,
+                "blocking" => 1,
+                "running" => 6usize.saturating_sub(frame % 6),
+                "walking" => (frame % 6) + 1,
+                _ => 1,
+            };
+            Some(("art/chars/door.spe", format!("door{frame_num:04}.pcx")))
+        }
+        "TP_DOOR_INVIS" => Some(("art/misc.spe", "clone_icon".to_string())),
+        "NEXT_LEVEL" => Some(("art/misc.spe", "end_port2".to_string())),
+        "NEXT_LEVEL_TOP" => Some(("art/misc.spe", "end_port1".to_string())),
+        "TELE_BEAM" => {
+            let frame_num = ((frame % 5) + 1) as u32;
+            Some(("art/chars/teleport.spe", format!("beam{frame_num:04}.pcx")))
+        }
+        "SPRING" => {
+            if state_name == "running" {
+                Some(("art/misc.spe", "spri0001.pcx".to_string()))
+            } else {
+                Some(("art/misc.spe", "spri0004.pcx".to_string()))
+            }
+        }
+        "LAVA" => {
+            let frame_num = ((frame % 15) + 1) as u32;
+            Some(("art/chars/lava.spe", format!("lava{frame_num:04}.pcx")))
+        }
+        "HEALTH" => Some(("art/ball.spe", "heart".to_string())),
+        "POWER_FAST" => Some(("art/misc.spe", "fast".to_string())),
+        "POWER_FLY" => Some(("art/misc.spe", "fly".to_string())),
+        "POWER_SNEAKY" => Some(("art/misc.spe", "sneaky".to_string())),
+        "POWER_HEALTH" => Some(("art/misc.spe", "b_check".to_string())),
+        "COMPASS" => Some(("art/compass.spe", "compass".to_string())),
+        "WHO" => {
+            let entry = match state_name {
+                "turn_around" => format!("wtrn{:04}.pcx", (frame % 9) + 1),
+                _ => format!("wgo{:04}.pcx", (frame % 3) + 1),
+            };
+            Some(("art/rob2.spe", entry))
+        }
+        "FORCE_FIELD" => Some(("art/misc.spe", "force_field".to_string())),
+        "LIGHTIN" => {
+            let frame_num = ((frame % 9) + 1) as u32;
+            Some(("art/chars/lightin.spe", format!("lite{frame_num:04}.pcx")))
+        }
+        "TRAP_DOOR2" => {
+            let frame_num = match state_name {
+                "stopped" => 1,
+                "blocking" => 7,
+                "running" => (frame % 7) + 1,
+                "walking" => 7usize.saturating_sub(frame % 7),
+                _ => 1,
+            };
+            Some(("art/chars/tdoor.spe", format!("tdor{frame_num:04}.pcx")))
+        }
+        "TRAP_DOOR3" => {
+            let frame_num = match state_name {
+                "stopped" => 1,
+                "blocking" => 7,
+                "running" => (frame % 7) + 1,
+                "walking" => 7usize.saturating_sub(frame % 7),
+                _ => 1,
+            };
+            Some(("art/chars/tdoor.spe", format!("cdor{frame_num:04}.pcx")))
+        }
+        "TELE2" => {
+            if state_name == "running" {
+                let frame_num = ((frame % 15) + 1) as u32;
+                Some(("art/chars/teleport.spe", format!("elec{frame_num:04}.pcx")))
+            } else {
+                Some(("art/chars/teleport.spe", "close".to_string()))
+            }
+        }
+        "STEP" => {
+            if state_name == "stopped" {
+                Some(("art/chars/step.spe", "step".to_string()))
+            } else {
+                Some(("art/chars/step.spe", "step_gone".to_string()))
+            }
+        }
+        "SWITCH" | "SWITCH_ONCE" | "SWITCH_DELAY" => {
+            let frame_num = ((frame % 18) + 1) as u32;
+            Some(("art/misc.spe", format!("swit{frame_num:04}.pcx")))
+        }
+        "SWITCH_BALL" => {
+            let frame_num = if state_name == "running" {
+                10 + (frame % 9)
+            } else {
+                1 + (frame % 9)
+            };
+            Some(("art/misc.spe", format!("swit{frame_num:04}.pcx")))
+        }
+        _ => None,
+    }
 }
 
 fn fit_camera_to_level(
@@ -396,7 +505,6 @@ fn camera_controls(
 
 fn update_hud(
     hud_state: Res<HudState>,
-    env_stats: Option<Res<EnvironmentStats>>,
     camera_query: Query<&Transform, With<ViewerCamera>>,
     mut hud_query: Query<&mut Text, With<ViewerHud>>,
 ) {
@@ -419,24 +527,13 @@ fn update_hud(
     let _old_zoom = lines.next();
     let objects_line = lines.next().unwrap_or("objects: ?");
     let lights_line = lines.next().unwrap_or("lights: ?");
-    let env_line = lines.next().unwrap_or("env: ?");
     let controls_line = lines
         .next()
-        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers, F3 env");
-
-    let env_count = env_stats.map_or_else(
-        || {
-            env_line
-                .strip_prefix("env: ")
-                .and_then(|rest| rest.parse::<usize>().ok())
-                .unwrap_or(0)
-        },
-        |stats| stats.count,
-    );
+        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD");
 
     text.0 = format!(
-        "{}\nzoom: {}%\n{}\n{}\nenv: {}\n{}",
-        level_line, zoom_percent, objects_line, lights_line, env_count, controls_line
+        "{}\nzoom: {}%\n{}\n{}\n{}",
+        level_line, zoom_percent, objects_line, lights_line, controls_line
     );
 }
 
@@ -452,96 +549,6 @@ fn toggle_hud_visibility(
     hud_state.visible = !hud_state.visible;
     if let Ok(mut visibility) = hud_query.single_mut() {
         *visibility = if hud_state.visible {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-    }
-}
-
-fn toggle_environment_markers(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut overlay_state: ResMut<DebugOverlayState>,
-    mut env_query: Query<&mut Visibility, With<DebugEnvironmentMarker>>,
-) {
-    if !keyboard.just_pressed(KeyCode::F3) {
-        return;
-    }
-
-    overlay_state.env_visible = !overlay_state.env_visible;
-
-    for mut visibility in &mut env_query {
-        *visibility = if overlay_state.env_visible {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
-    }
-}
-
-fn is_environment_object(object: &abuse_runtime::data::level::LoadedObject) -> bool {
-    let hp = object.var(VAR_HP).unwrap_or(0);
-    let aitype = object.var(VAR_AITYPE).unwrap_or(0);
-    let targetable = object.var(VAR_TARGETABLE).unwrap_or(0);
-    let xvel = object.var(VAR_XVEL).unwrap_or(0);
-    let yvel = object.var(VAR_YVEL).unwrap_or(0);
-    let xacel = object.var(VAR_XACEL).unwrap_or(0);
-    let yacel = object.var(VAR_YACEL).unwrap_or(0);
-
-    let is_static = xvel == 0 && yvel == 0 && xacel == 0 && yacel == 0;
-    let low_hp_or_none = hp <= 0 || hp < 20;
-    let no_ai = aitype == 0;
-    let non_targetable = targetable == 0;
-
-    is_static && low_hp_or_none && (no_ai || non_targetable)
-}
-
-fn collect_environment_candidates(level: &LevelData) -> HashSet<i32> {
-    let mut linked_objects = HashSet::new();
-    for link in &level.object_links {
-        if link.from_object >= 0 {
-            linked_objects.insert(link.from_object);
-        }
-        if link.to_object >= 0 {
-            linked_objects.insert(link.to_object);
-        }
-    }
-    for link in &level.light_links {
-        if link.from_object >= 0 {
-            linked_objects.insert(link.from_object);
-        }
-    }
-
-    let mut out = HashSet::new();
-    for (index, object) in level.objects.iter().enumerate() {
-        let idx = index as i32;
-        let structural = linked_objects.contains(&idx);
-        let heuristic = is_environment_object(object);
-
-        let targetable = object.var(VAR_TARGETABLE).unwrap_or(0);
-        let hp = object.var(VAR_HP).unwrap_or(0);
-        let likely_actor = targetable != 0 && hp > 20;
-
-        if (structural || heuristic) && !likely_actor {
-            out.insert(idx);
-        }
-    }
-
-    out
-}
-
-fn toggle_debug_markers(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut overlay_state: ResMut<DebugOverlayState>,
-    mut marker_query: Query<&mut Visibility, With<DebugMarker>>,
-) {
-    if !keyboard.just_pressed(KeyCode::F2) {
-        return;
-    }
-
-    overlay_state.markers_visible = !overlay_state.markers_visible;
-    for mut visibility in &mut marker_query {
-        *visibility = if overlay_state.markers_visible {
             Visibility::Visible
         } else {
             Visibility::Hidden
@@ -613,6 +620,45 @@ fn load_legacy_tile_set(
     })
 }
 
+fn load_object_sprite_library(
+    level_path: &Path,
+    images: &mut Assets<Image>,
+) -> Result<ObjectSpriteLibrary, String> {
+    let data_root = level_path
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| format!("could not derive data root from {}", level_path.display()))?;
+    let fallback_palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
+
+    let mut sprites = HashMap::new();
+    for rel in OBJECT_SPE_FILES {
+        let path = data_root.join(rel);
+        if !path.exists() {
+            continue;
+        }
+
+        let directory = SpeDirectory::open_lenient(&path).map_err(|err| err.to_string())?;
+        let palette = read_palette(&path).unwrap_or_else(|_| fallback_palette.clone());
+        let mut file = File::open(&path).map_err(|err| err.to_string())?;
+
+        for entry in directory.entries.iter().filter(|entry| {
+            matches!(
+                entry.spec_type,
+                SpecType::Image | SpecType::Character | SpecType::Character2
+            )
+        }) {
+            let (rgba, width, height) = read_image_entry(&mut file, entry.offset, &palette)?;
+            let handle = images.add(image_from_rgba(width, height, rgba));
+            sprites.insert(
+                (rel.to_ascii_lowercase(), entry.name.to_ascii_lowercase()),
+                handle,
+            );
+        }
+    }
+
+    Ok(ObjectSpriteLibrary { sprites })
+}
+
 fn read_palette(path: &Path) -> Result<Vec<[u8; 3]>, String> {
     let directory = SpeDirectory::open_lenient(path).map_err(|err| err.to_string())?;
     let palette_entry = directory
@@ -674,40 +720,45 @@ fn read_tile_images_from_spe(
             continue;
         };
 
-        file.seek(SeekFrom::Start(u64::from(entry.offset)))
-            .map_err(|err| err.to_string())?;
-        let width = file
-            .read_u16::<LittleEndian>()
-            .map_err(|err| err.to_string())? as u32;
-        let height = file
-            .read_u16::<LittleEndian>()
-            .map_err(|err| err.to_string())? as u32;
-        let pixel_count = usize::try_from(width.saturating_mul(height)).map_err(|_| {
-            format!(
-                "tile image too large in {} entry {}",
-                path.display(),
-                entry.name
-            )
-        })?;
-
-        let mut indexed = vec![0_u8; pixel_count];
-        file.read_exact(&mut indexed)
-            .map_err(|err| err.to_string())?;
-
-        let mut rgba = vec![0_u8; pixel_count * 4];
-        for (i, idx) in indexed.into_iter().enumerate() {
-            let color = palette.get(idx as usize).copied().unwrap_or([0, 0, 0]);
-            let base = i * 4;
-            rgba[base] = color[0];
-            rgba[base + 1] = color[1];
-            rgba[base + 2] = color[2];
-            rgba[base + 3] = if idx == 0 { 0 } else { 255 };
-        }
-
+        let (rgba, width, height) = read_image_entry(&mut file, entry.offset, palette)?;
         out.push((tile_id, rgba, width, height));
     }
 
     Ok(out)
+}
+
+fn read_image_entry(
+    file: &mut File,
+    offset: u32,
+    palette: &[[u8; 3]],
+) -> Result<(Vec<u8>, u32, u32), String> {
+    file.seek(SeekFrom::Start(u64::from(offset)))
+        .map_err(|err| err.to_string())?;
+
+    let width = file
+        .read_u16::<LittleEndian>()
+        .map_err(|err| err.to_string())? as u32;
+    let height = file
+        .read_u16::<LittleEndian>()
+        .map_err(|err| err.to_string())? as u32;
+    let pixel_count = usize::try_from(width.saturating_mul(height))
+        .map_err(|_| format!("image too large: {}x{}", width, height))?;
+
+    let mut indexed = vec![0_u8; pixel_count];
+    file.read_exact(&mut indexed)
+        .map_err(|err| err.to_string())?;
+
+    let mut rgba = vec![0_u8; pixel_count * 4];
+    for (i, idx) in indexed.into_iter().enumerate() {
+        let color = palette.get(idx as usize).copied().unwrap_or([0, 0, 0]);
+        let base = i * 4;
+        rgba[base] = color[0];
+        rgba[base + 1] = color[1];
+        rgba[base + 2] = color[2];
+        rgba[base + 3] = if idx == 0 { 0 } else { 255 };
+    }
+
+    Ok((rgba, width, height))
 }
 
 fn image_from_rgba(width: u32, height: u32, rgba: Vec<u8>) -> Image {
@@ -722,4 +773,27 @@ fn image_from_rgba(width: u32, height: u32, rgba: Vec<u8>) -> Image {
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     )
+}
+
+fn make_radial_glow_texture(size: u32) -> Image {
+    let mut rgba = vec![0_u8; (size * size * 4) as usize];
+    let c = size as f32 * 0.5;
+    let max_r = c - 1.0;
+
+    for y in 0..size {
+        for x in 0..size {
+            let dx = x as f32 - c;
+            let dy = y as f32 - c;
+            let dist = (dx * dx + dy * dy).sqrt();
+            let t = (1.0 - dist / max_r).clamp(0.0, 1.0);
+            let a = (t * t * 255.0) as u8;
+            let i = ((y * size + x) * 4) as usize;
+            rgba[i] = 255;
+            rgba[i + 1] = 255;
+            rgba[i + 2] = 255;
+            rgba[i + 3] = a;
+        }
+    }
+
+    image_from_rgba(size, size, rgba)
 }

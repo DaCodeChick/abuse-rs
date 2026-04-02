@@ -45,6 +45,7 @@ const OBJECT_VAR_SPECS: [(&str, u8); TOTAL_OBJECT_VARS] = [
 
 pub const VAR_X: usize = 17;
 pub const VAR_Y: usize = 19;
+pub const VAR_CUR_FRAME: usize = 24;
 pub const VAR_HP: usize = 21;
 pub const VAR_AITYPE: usize = 8;
 pub const VAR_XVEL: usize = 9;
@@ -69,6 +70,8 @@ pub struct LevelData {
     pub bg_ydiv: u32,
     pub object_count: Option<u32>,
     pub objects: Vec<LoadedObject>,
+    pub object_type_names: Vec<String>,
+    pub object_state_names: Vec<Vec<String>>,
     pub min_light_level: Option<u32>,
     pub lights: Vec<LoadedLight>,
     pub object_links: Vec<ObjectLink>,
@@ -79,6 +82,8 @@ pub struct LevelData {
 pub struct LoadedObject {
     pub type_id: u16,
     pub state_id: u16,
+    pub type_name: Option<String>,
+    pub state_name: Option<String>,
     pub lvars: Vec<i32>,
     pub vars: [i32; TOTAL_OBJECT_VARS],
 }
@@ -169,7 +174,16 @@ impl LevelData {
         let (bg_xmul, bg_xdiv, bg_ymul, bg_ydiv) =
             read_bg_scroll_rate(&directory, &mut file, path_ref)?;
         let object_count = read_object_count(&directory, &mut file, path_ref)?;
-        let objects = read_objects(&directory, &mut file, path_ref, object_count)?;
+        let (object_type_names, object_state_names) =
+            read_object_descriptions(&directory, &mut file, path_ref)?;
+        let objects = read_objects(
+            &directory,
+            &mut file,
+            path_ref,
+            object_count,
+            &object_type_names,
+            &object_state_names,
+        )?;
         let (min_light_level, lights) = read_lights(&directory, &mut file, path_ref)?;
         let object_links = read_object_links(&directory, &mut file, path_ref)?;
         let light_links = read_light_links(&directory, &mut file, path_ref)?;
@@ -189,6 +203,8 @@ impl LevelData {
             bg_ydiv,
             object_count,
             objects,
+            object_type_names,
+            object_state_names,
             min_light_level,
             lights,
             object_links,
@@ -401,6 +417,8 @@ fn read_objects(
     file: &mut File,
     path: &Path,
     object_count: Option<u32>,
+    object_type_names: &[String],
+    object_state_names: &[Vec<String>],
 ) -> Result<Vec<LoadedObject>, LevelError> {
     let Some(total_u32) = object_count else {
         return Ok(Vec::new());
@@ -420,12 +438,109 @@ fn read_objects(
         objects.push(LoadedObject {
             type_id: type_ids[idx],
             state_id: state_ids[idx],
+            type_name: object_type_names.get(type_ids[idx] as usize).cloned(),
+            state_name: object_state_names
+                .get(type_ids[idx] as usize)
+                .and_then(|states| states.get(state_ids[idx] as usize))
+                .cloned(),
             lvars: lvars[idx].clone(),
             vars: vars[idx],
         });
     }
 
     Ok(objects)
+}
+
+fn read_object_descriptions(
+    directory: &SpeDirectory,
+    file: &mut File,
+    path: &Path,
+) -> Result<(Vec<String>, Vec<Vec<String>>), LevelError> {
+    let Some(descriptions) = directory.find_by_name("object_descripitions") else {
+        return Ok((Vec::new(), Vec::new()));
+    };
+
+    file.seek(SeekFrom::Start(u64::from(descriptions.offset)))
+        .map_err(|source| LevelError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+    let total = file
+        .read_u16::<LittleEndian>()
+        .map_err(|source| LevelError::Read {
+            path: path.to_path_buf(),
+            source,
+        })? as usize;
+
+    let mut type_names = Vec::new();
+    if let Some(entry) = directory.find_by_name("describe_names") {
+        file.seek(SeekFrom::Start(u64::from(entry.offset)))
+            .map_err(|source| LevelError::Read {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        type_names.reserve(total);
+        for _ in 0..total {
+            type_names.push(read_cursor_len_prefixed_string(
+                file,
+                path,
+                "describe_names",
+            )?);
+        }
+    }
+
+    let mut state_names = Vec::new();
+    if let Some(entry) = directory.find_by_name("describe_states") {
+        file.seek(SeekFrom::Start(u64::from(entry.offset)))
+            .map_err(|source| LevelError::Read {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        state_names.reserve(total);
+
+        for _ in 0..total {
+            let states_total =
+                file.read_u16::<LittleEndian>()
+                    .map_err(|source| LevelError::Read {
+                        path: path.to_path_buf(),
+                        source,
+                    })? as usize;
+            let mut states = Vec::with_capacity(states_total);
+            for _ in 0..states_total {
+                states.push(read_cursor_len_prefixed_string(
+                    file,
+                    path,
+                    "describe_states",
+                )?);
+            }
+            state_names.push(states);
+        }
+    }
+
+    Ok((type_names, state_names))
+}
+
+fn read_cursor_len_prefixed_string(
+    file: &mut File,
+    path: &Path,
+    entry_name: &'static str,
+) -> Result<String, LevelError> {
+    let len = file.read_u8().map_err(|source| LevelError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let mut bytes = vec![0_u8; usize::from(len)];
+    file.read_exact(&mut bytes)
+        .map_err(|source| LevelError::Read {
+            path: path.to_path_buf(),
+            source,
+        })?;
+
+    if bytes.last().copied() == Some(0) {
+        bytes.pop();
+    }
+
+    String::from_utf8(bytes).map_err(|_| LevelError::InvalidString { entry: entry_name })
 }
 
 fn read_object_u16_array(
