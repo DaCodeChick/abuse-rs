@@ -45,6 +45,9 @@ cargo run -p abuse-game -- /path/to/levels/level00.spe
 This renders a debug view of FG/BG tiles plus object/light markers from parsed legacy
 level data.
 
+When legacy tile archives are found under `data/art`, the viewer uses decoded Abuse tile
+textures. Otherwise it falls back to debug-colored tiles.
+
 Viewer controls:
 
 - `WASD` or arrow keys: pan
