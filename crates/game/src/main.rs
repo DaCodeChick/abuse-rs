@@ -1,8 +1,14 @@
 use std::path::PathBuf;
-use std::{collections::HashMap, fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
+use std::{
+    collections::HashMap, collections::HashSet, fs::File, io::Read, io::Seek, io::SeekFrom,
+    path::Path,
+};
 
 use abuse_runtime::AbuseRuntimePlugins;
-use abuse_runtime::data::level::{LevelData, VAR_X, VAR_Y};
+use abuse_runtime::data::level::{
+    LevelData, VAR_AITYPE, VAR_HP, VAR_TARGETABLE, VAR_X, VAR_XACEL, VAR_XVEL, VAR_Y, VAR_YACEL,
+    VAR_YVEL,
+};
 use abuse_runtime::data::spe::{SpeDirectory, SpecType};
 use bevy::asset::RenderAssetUsages;
 use bevy::input::mouse::MouseWheel;
@@ -51,6 +57,9 @@ struct ViewerHud;
 #[derive(Component)]
 struct DebugMarker;
 
+#[derive(Component)]
+struct DebugEnvironmentMarker;
+
 #[derive(Resource, Debug, Clone, Copy)]
 struct HudState {
     visible: bool,
@@ -59,6 +68,7 @@ struct HudState {
 #[derive(Resource, Debug, Clone, Copy)]
 struct DebugOverlayState {
     markers_visible: bool,
+    env_visible: bool,
 }
 
 #[derive(Resource, Debug, Clone)]
@@ -70,6 +80,11 @@ struct ViewerConfig {
 struct LevelViewBounds {
     width: f32,
     height: f32,
+}
+
+#[derive(Resource, Debug, Clone, Copy)]
+struct EnvironmentStats {
+    count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -89,6 +104,7 @@ fn main() {
         .insert_resource(HudState { visible: true })
         .insert_resource(DebugOverlayState {
             markers_visible: true,
+            env_visible: false,
         })
         .add_plugins(AbuseRuntimePlugins)
         .add_systems(Startup, (setup_camera, load_level_view).chain())
@@ -98,6 +114,7 @@ fn main() {
                 camera_controls,
                 toggle_hud_visibility,
                 toggle_debug_markers,
+                toggle_environment_markers,
                 update_hud,
             ),
         )
@@ -108,7 +125,7 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, ViewerCamera));
 }
 
-fn spawn_hud(commands: &mut Commands, level: &LevelData) {
+fn spawn_hud(commands: &mut Commands, level: &LevelData, env_count: usize) {
     let level_name = std::path::Path::new(&level.name)
         .file_name()
         .and_then(|name| name.to_str())
@@ -116,10 +133,11 @@ fn spawn_hud(commands: &mut Commands, level: &LevelData) {
 
     commands.spawn((
         Text::new(format!(
-            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers",
+            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\nenv: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers, F3 env",
             level_name,
             level.objects.len(),
-            level.lights.len()
+            level.lights.len(),
+            env_count,
         )),
         Node {
             position_type: PositionType::Absolute,
@@ -173,6 +191,11 @@ fn load_level_view(
     commands.insert_resource(LevelViewBounds {
         width: fg_world_w,
         height: fg_world_h,
+    });
+
+    let env_candidates = collect_environment_candidates(&level);
+    commands.insert_resource(EnvironmentStats {
+        count: env_candidates.len(),
     });
 
     if let (Ok(window), Ok(mut camera_transform)) =
@@ -240,9 +263,19 @@ fn load_level_view(
         }
     }
 
-    for object in &level.objects {
+    for (index, object) in level.objects.iter().enumerate() {
         let x = object.var(VAR_X).unwrap_or(0) as f32 - fg_world_w * 0.5;
         let y = fg_world_h * 0.5 - object.var(VAR_Y).unwrap_or(0) as f32;
+
+        if env_candidates.contains(&(index as i32)) {
+            commands.spawn((
+                Sprite::from_color(Color::srgba(0.2, 0.78, 0.95, 0.9), Vec2::new(12.0, 12.0)),
+                Transform::from_xyz(x, y, 3.6),
+                Visibility::Hidden,
+                DebugEnvironmentMarker,
+            ));
+        }
+
         commands.spawn((
             Sprite::from_color(Color::srgba(0.92, 0.28, 0.2, 0.9), Vec2::splat(7.0)),
             Transform::from_xyz(x, y, 3.0),
@@ -271,7 +304,7 @@ fn load_level_view(
         level.lights.len()
     );
 
-    spawn_hud(&mut commands, &level);
+    spawn_hud(&mut commands, &level, env_candidates.len());
 }
 
 fn fit_camera_to_level(
@@ -363,6 +396,7 @@ fn camera_controls(
 
 fn update_hud(
     hud_state: Res<HudState>,
+    env_stats: Option<Res<EnvironmentStats>>,
     camera_query: Query<&Transform, With<ViewerCamera>>,
     mut hud_query: Query<&mut Text, With<ViewerHud>>,
 ) {
@@ -385,13 +419,24 @@ fn update_hud(
     let _old_zoom = lines.next();
     let objects_line = lines.next().unwrap_or("objects: ?");
     let lights_line = lines.next().unwrap_or("lights: ?");
+    let env_line = lines.next().unwrap_or("env: ?");
     let controls_line = lines
         .next()
-        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers");
+        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, F2 markers, F3 env");
+
+    let env_count = env_stats.map_or_else(
+        || {
+            env_line
+                .strip_prefix("env: ")
+                .and_then(|rest| rest.parse::<usize>().ok())
+                .unwrap_or(0)
+        },
+        |stats| stats.count,
+    );
 
     text.0 = format!(
-        "{}\nzoom: {}%\n{}\n{}\n{}",
-        level_line, zoom_percent, objects_line, lights_line, controls_line
+        "{}\nzoom: {}%\n{}\n{}\nenv: {}\n{}",
+        level_line, zoom_percent, objects_line, lights_line, env_count, controls_line
     );
 }
 
@@ -412,6 +457,77 @@ fn toggle_hud_visibility(
             Visibility::Hidden
         };
     }
+}
+
+fn toggle_environment_markers(
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut overlay_state: ResMut<DebugOverlayState>,
+    mut env_query: Query<&mut Visibility, With<DebugEnvironmentMarker>>,
+) {
+    if !keyboard.just_pressed(KeyCode::F3) {
+        return;
+    }
+
+    overlay_state.env_visible = !overlay_state.env_visible;
+
+    for mut visibility in &mut env_query {
+        *visibility = if overlay_state.env_visible {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+}
+
+fn is_environment_object(object: &abuse_runtime::data::level::LoadedObject) -> bool {
+    let hp = object.var(VAR_HP).unwrap_or(0);
+    let aitype = object.var(VAR_AITYPE).unwrap_or(0);
+    let targetable = object.var(VAR_TARGETABLE).unwrap_or(0);
+    let xvel = object.var(VAR_XVEL).unwrap_or(0);
+    let yvel = object.var(VAR_YVEL).unwrap_or(0);
+    let xacel = object.var(VAR_XACEL).unwrap_or(0);
+    let yacel = object.var(VAR_YACEL).unwrap_or(0);
+
+    let is_static = xvel == 0 && yvel == 0 && xacel == 0 && yacel == 0;
+    let low_hp_or_none = hp <= 0 || hp < 20;
+    let no_ai = aitype == 0;
+    let non_targetable = targetable == 0;
+
+    is_static && low_hp_or_none && (no_ai || non_targetable)
+}
+
+fn collect_environment_candidates(level: &LevelData) -> HashSet<i32> {
+    let mut linked_objects = HashSet::new();
+    for link in &level.object_links {
+        if link.from_object >= 0 {
+            linked_objects.insert(link.from_object);
+        }
+        if link.to_object >= 0 {
+            linked_objects.insert(link.to_object);
+        }
+    }
+    for link in &level.light_links {
+        if link.from_object >= 0 {
+            linked_objects.insert(link.from_object);
+        }
+    }
+
+    let mut out = HashSet::new();
+    for (index, object) in level.objects.iter().enumerate() {
+        let idx = index as i32;
+        let structural = linked_objects.contains(&idx);
+        let heuristic = is_environment_object(object);
+
+        let targetable = object.var(VAR_TARGETABLE).unwrap_or(0);
+        let hp = object.var(VAR_HP).unwrap_or(0);
+        let likely_actor = targetable != 0 && hp > 20;
+
+        if (structural || heuristic) && !likely_actor {
+            out.insert(idx);
+        }
+    }
+
+    out
 }
 
 fn toggle_debug_markers(

@@ -46,6 +46,12 @@ const OBJECT_VAR_SPECS: [(&str, u8); TOTAL_OBJECT_VARS] = [
 pub const VAR_X: usize = 17;
 pub const VAR_Y: usize = 19;
 pub const VAR_HP: usize = 21;
+pub const VAR_AITYPE: usize = 8;
+pub const VAR_XVEL: usize = 9;
+pub const VAR_YVEL: usize = 11;
+pub const VAR_XACEL: usize = 13;
+pub const VAR_YACEL: usize = 15;
+pub const VAR_TARGETABLE: usize = 27;
 
 #[derive(Debug, Clone)]
 pub struct LevelData {
