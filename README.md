@@ -21,8 +21,7 @@ This repository is currently in bootstrap phase:
 |- PLAN.md               # Milestones and compatibility plan
 |- crates/
 |  |- data/              # Legacy format readers (.spe, levels, scripts)
-|  |- sim/               # Deterministic gameplay simulation core
-|  |- runtime/           # Bevy integration (render, input, audio)
+|  |- runtime/           # Bevy integration + simulation core
 |  |- game/              # Main executable
 |  `- tools/             # Data inspection and conversion tools
 `- docs/

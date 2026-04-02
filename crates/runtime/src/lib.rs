@@ -1,6 +1,12 @@
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompatibilityMode {
+    Strict,
+    Lenient,
+}
+
 pub struct AbuseRuntimePlugins;
 
 impl PluginGroup for AbuseRuntimePlugins {

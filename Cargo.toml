@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/data",
-    "crates/sim",
     "crates/runtime",
     "crates/game",
     "crates/tools",
