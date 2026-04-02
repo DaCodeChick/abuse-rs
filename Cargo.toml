@@ -1,0 +1,21 @@
+[workspace]
+members = [
+    "crates/data",
+    "crates/sim",
+    "crates/runtime",
+    "crates/game",
+    "crates/tools",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "GPL-3.0-or-later"
+authors = ["abuse-rs contributors"]
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+bevy = "0.18.1"
+uuid = "1.23"

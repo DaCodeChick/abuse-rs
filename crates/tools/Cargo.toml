@@ -1,0 +1,8 @@
+[package]
+name = "abuse-tools"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+abuse-data = { path = "../data" }

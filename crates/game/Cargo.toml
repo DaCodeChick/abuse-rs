@@ -1,0 +1,9 @@
+[package]
+name = "abuse-game"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bevy.workspace = true
+abuse-runtime = { path = "../runtime" }
