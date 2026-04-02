@@ -265,7 +265,11 @@ fn load_level_view(
                     if let Some(image) = images.get(&texture) {
                         y += image.height() as f32 * 0.5;
                     }
-                    commands.spawn((Sprite::from_image(texture), Transform::from_xyz(x, y, 2.5)));
+                    let (dx, dy, z) = object_render_adjustment(object.type_name.as_deref());
+                    commands.spawn((
+                        Sprite::from_image(texture),
+                        Transform::from_xyz(x + dx, y + dy, z),
+                    ));
                 }
             }
         }
@@ -277,19 +281,29 @@ fn load_level_view(
         let y = fg_world_h * 0.5 - light.y as f32;
         let radius = light.outer_radius.max(8) as f32;
         let tint = match light.light_type {
-            1 => Color::srgba(0.85, 0.75, 0.45, 0.26),
-            3 => Color::srgba(0.72, 0.45, 0.92, 0.28),
-            _ => Color::srgba(0.8, 0.8, 0.75, 0.2),
+            1 => Color::srgba(0.92, 0.78, 0.44, 0.42),
+            3 => Color::srgba(0.73, 0.42, 0.96, 0.45),
+            _ => Color::srgba(0.86, 0.84, 0.78, 0.32),
         };
 
         commands.spawn((
             Sprite {
                 image: light_glow.clone(),
-                custom_size: Some(Vec2::splat(radius * 2.0)),
+                custom_size: Some(Vec2::splat(radius * 2.6)),
                 color: tint,
                 ..default()
             },
             Transform::from_xyz(x, y, 2.2),
+        ));
+
+        commands.spawn((
+            Sprite {
+                image: light_glow.clone(),
+                custom_size: Some(Vec2::splat(radius * 1.2)),
+                color: Color::srgba(1.0, 1.0, 1.0, 0.18),
+                ..default()
+            },
+            Transform::from_xyz(x, y, 2.21),
         ));
     }
 
@@ -305,6 +319,20 @@ fn load_level_view(
     );
 
     spawn_hud(&mut commands, &level);
+}
+
+fn object_render_adjustment(type_name: Option<&str>) -> (f32, f32, f32) {
+    match type_name.unwrap_or_default() {
+        "NEXT_LEVEL" => (0.0, -4.0, 2.7),
+        "NEXT_LEVEL_TOP" => (0.0, -8.0, 2.71),
+        "TELE_BEAM" => (0.0, -6.0, 2.72),
+        "TP_DOOR" | "SWITCH_DOOR" | "TRAP_DOOR2" | "TRAP_DOOR3" => (0.0, -3.0, 2.65),
+        "SPRING" => (0.0, -2.0, 2.6),
+        "LAVA" => (0.0, -1.0, 2.55),
+        "HEALTH" | "POWER_FAST" | "POWER_FLY" | "POWER_SNEAKY" | "POWER_HEALTH" => (0.0, 6.0, 2.9),
+        "WHO" => (0.0, -4.0, 2.8),
+        _ => (0.0, 0.0, 2.5),
+    }
 }
 
 fn resolve_object_sprite(
