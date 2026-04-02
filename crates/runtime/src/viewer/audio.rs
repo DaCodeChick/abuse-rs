@@ -1,3 +1,8 @@
+//! Object-driven viewer audio utilities.
+//!
+//! The viewer intentionally avoids heuristic ambient loops and instead emits short
+//! one-shot sounds when specific object classes are present in the loaded level.
+
 use std::time::Duration;
 
 use bevy::audio::Volume;
@@ -5,15 +10,30 @@ use bevy::prelude::*;
 
 use crate::data::level::LevelData;
 
+/// Runtime audio controls exposed to viewer systems.
 #[derive(Resource, Debug, Clone)]
 pub struct AudioState {
+    /// Whether viewer SFX are currently enabled.
     pub enabled: bool,
+    /// Master SFX volume in range `[0.0, 1.0]`.
     pub volume: f32,
 }
 
+impl AudioState {
+    /// Default interactive viewer audio state.
+    pub const fn default_enabled() -> Self {
+        Self {
+            enabled: true,
+            volume: 0.45,
+        }
+    }
+}
+
+/// Marker component for one-shot audio entities.
 #[derive(Component)]
 pub struct OneShotAudio;
 
+/// Spawns object-context one-shot sounds for the current level.
 pub fn spawn_context_audio(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -90,6 +110,7 @@ pub fn spawn_context_audio(
     }
 }
 
+/// Spawns one-shot SFX with optional max playback duration.
 pub fn spawn_one_shot(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -110,12 +131,14 @@ pub fn spawn_one_shot(
     ));
 }
 
+/// Toggles global viewer SFX enabled state with `M`.
 pub fn toggle_audio(keyboard: Res<ButtonInput<KeyCode>>, mut audio_state: ResMut<AudioState>) {
     if keyboard.just_pressed(KeyCode::KeyM) {
         audio_state.enabled = !audio_state.enabled;
     }
 }
 
+/// Adjusts viewer SFX volume with `-` and `+` keys.
 pub fn adjust_audio_volume(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut audio_state: ResMut<AudioState>,
@@ -137,6 +160,7 @@ pub fn adjust_audio_volume(
     }
 }
 
+/// Applies current audio state to active one-shot sinks.
 pub fn sync_audio_volume(
     audio_state: Res<AudioState>,
     mut oneshots: Query<&mut AudioSink, With<OneShotAudio>>,

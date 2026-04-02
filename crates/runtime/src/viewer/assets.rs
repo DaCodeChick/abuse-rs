@@ -1,3 +1,8 @@
+//! Legacy viewer asset loading and decoding helpers.
+//!
+//! This module handles palette and indexed image decoding from Abuse SPE archives,
+//! then converts them into Bevy `Image` textures for viewer rendering.
+
 use std::collections::HashMap;
 use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 
@@ -9,20 +14,28 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use crate::data::spe::{SpeDirectory, SpecType};
 use crate::viewer::constants::{BG_TILE_SPE_FILES, FG_TILE_SPE_FILES, OBJECT_SPE_FILES};
 
+/// In-memory FG/BG tile texture lookup tables with discovered tile dimensions.
 #[derive(Debug, Clone)]
 pub struct LegacyTileSet {
+    /// Foreground tiles by tile id.
     pub fg_tiles: HashMap<u16, Handle<Image>>,
+    /// Background tiles by tile id.
     pub bg_tiles: HashMap<u16, Handle<Image>>,
+    /// Foreground tile dimensions.
     pub fg_tile_size: Vec2,
+    /// Background tile dimensions.
     pub bg_tile_size: Vec2,
 }
 
+/// Lookup map for object sprites keyed by `(archive_path, entry_name)`.
 #[derive(Debug, Clone)]
 pub struct ObjectSpriteLibrary {
+    /// Texture handles indexed by lowercase key pair.
     pub sprites: HashMap<(String, String), Handle<Image>>,
 }
 
 impl ObjectSpriteLibrary {
+    /// Returns a sprite handle for a given archive path and entry name.
     pub fn get(&self, spe_path: &str, entry_name: &str) -> Option<Handle<Image>> {
         self.sprites
             .get(&(
@@ -33,6 +46,7 @@ impl ObjectSpriteLibrary {
     }
 }
 
+/// Loads foreground/background tile textures from known legacy archives.
 pub fn load_legacy_tile_set(
     level_path: &Path,
     images: &mut Assets<Image>,
@@ -86,6 +100,7 @@ pub fn load_legacy_tile_set(
     })
 }
 
+/// Loads mapped object sprite textures from known object archives.
 pub fn load_object_sprite_library(
     level_path: &Path,
     images: &mut Assets<Image>,
@@ -123,6 +138,7 @@ pub fn load_object_sprite_library(
     Ok(ObjectSpriteLibrary { sprites })
 }
 
+/// Derives the legacy data root (`.../data`) from a level path.
 pub fn derive_data_root(level_path: &Path) -> Option<std::path::PathBuf> {
     level_path
         .parent()
@@ -130,6 +146,7 @@ pub fn derive_data_root(level_path: &Path) -> Option<std::path::PathBuf> {
         .map(std::path::PathBuf::from)
 }
 
+/// Reads and normalizes a palette entry from an SPE archive.
 pub fn read_palette(path: &Path) -> Result<Vec<[u8; 3]>, String> {
     let directory = SpeDirectory::open_lenient(path).map_err(|err| err.to_string())?;
     let palette_entry = directory
@@ -173,11 +190,15 @@ pub fn read_palette(path: &Path) -> Result<Vec<[u8; 3]>, String> {
     Ok(colors)
 }
 
+/// A tile image with its ID, RGBA data, width, and height.
+type TileImage = (u16, Vec<u8>, u32, u32);
+
+/// Reads all tile images of a specific type from an SPE archive.
 pub fn read_tile_images_from_spe(
     path: &Path,
     tile_type: SpecType,
     palette: &[[u8; 3]],
-) -> Result<Vec<(u16, Vec<u8>, u32, u32)>, String> {
+) -> Result<Vec<TileImage>, String> {
     let directory = SpeDirectory::open_lenient(path).map_err(|err| err.to_string())?;
     let mut file = File::open(path).map_err(|err| err.to_string())?;
 
@@ -198,6 +219,7 @@ pub fn read_tile_images_from_spe(
     Ok(out)
 }
 
+/// Reads one indexed legacy image payload and converts it to RGBA bytes.
 pub fn read_image_entry(
     file: &mut File,
     offset: u32,
@@ -232,6 +254,7 @@ pub fn read_image_entry(
     Ok((rgba, width, height))
 }
 
+/// Creates a Bevy image from raw RGBA bytes.
 pub fn image_from_rgba(width: u32, height: u32, rgba: Vec<u8>) -> Image {
     Image::new(
         Extent3d {
@@ -246,6 +269,7 @@ pub fn image_from_rgba(width: u32, height: u32, rgba: Vec<u8>) -> Image {
     )
 }
 
+/// Creates a soft radial glow texture used for light overlays.
 pub fn make_radial_glow_texture(size: u32) -> Image {
     let mut rgba = vec![0_u8; (size * size * 4) as usize];
     let c = size as f32 * 0.5;

@@ -52,7 +52,7 @@ fn main() {
                     for (idx, entry) in directory.entries.iter().enumerate() {
                         println!(
                             "[{idx:04}] type={:>3} flags={:>3} size={:>8} offset={:>8} name={}",
-                            entry.spec_type.as_u8(),
+                            u8::from(entry.spec_type),
                             entry.flags,
                             entry.size,
                             entry.offset,

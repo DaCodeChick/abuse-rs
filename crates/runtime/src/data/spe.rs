@@ -5,8 +5,10 @@ use std::path::Path;
 use byteorder::{LittleEndian, ReadBytesExt};
 use thiserror::Error;
 
+/// Binary signature expected at the beginning of legacy SPE archives.
 pub const SPEC_SIGNATURE: &[u8; 8] = b"SPEC1.0\0";
 
+/// Legacy SPE entry type ids.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SpecType {
@@ -35,6 +37,7 @@ pub enum SpecType {
     ExternalLcache = 23,
 }
 
+/// Metadata for a single SPE directory entry.
 #[derive(Debug, Clone)]
 pub struct SpeEntry {
     pub spec_type: SpecType,
@@ -44,17 +47,20 @@ pub struct SpeEntry {
     pub offset: u32,
 }
 
+/// Parsed SPE directory with all known entries.
 #[derive(Debug, Clone)]
 pub struct SpeDirectory {
     pub entries: Vec<SpeEntry>,
 }
 
+/// Parse strictness for unknown/invalid SPE data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpeParseMode {
     Strict,
     Lenient,
 }
 
+/// SPE parsing/IO errors.
 #[derive(Debug, Error)]
 pub enum SpeError {
     #[error("failed to open spe file at {path}: {source}")]
@@ -79,12 +85,6 @@ pub enum SpeError {
     InvalidNameEncoding { index: usize },
     #[error("entry at index {index} has impossible offset/size combination")]
     InvalidEntryBounds { index: usize },
-}
-
-impl SpecType {
-    pub const fn as_u8(self) -> u8 {
-        self as u8
-    }
 }
 
 impl TryFrom<u8> for SpecType {
@@ -120,15 +120,24 @@ impl TryFrom<u8> for SpecType {
     }
 }
 
+impl From<SpecType> for u8 {
+    fn from(value: SpecType) -> Self {
+        value as u8
+    }
+}
+
 impl SpeDirectory {
+    /// Opens and parses an SPE archive in strict mode.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SpeError> {
         Self::open_with_mode(path, SpeParseMode::Strict)
     }
 
+    /// Opens and parses an SPE archive in lenient mode.
     pub fn open_lenient(path: impl AsRef<Path>) -> Result<Self, SpeError> {
         Self::open_with_mode(path, SpeParseMode::Lenient)
     }
 
+    /// Opens and parses an SPE archive with explicit parse mode.
     pub fn open_with_mode(path: impl AsRef<Path>, mode: SpeParseMode) -> Result<Self, SpeError> {
         let path_ref = path.as_ref();
         let mut file = File::open(path_ref).map_err(|source| SpeError::Open {
@@ -252,16 +261,19 @@ impl SpeDirectory {
         Ok(Self { entries })
     }
 
+    /// Finds the first entry by exact name.
     pub fn find_by_name(&self, name: &str) -> Option<&SpeEntry> {
         self.entries.iter().find(|entry| entry.name == name)
     }
 
+    /// Finds the first entry by SPE type.
     pub fn find_by_type(&self, spec_type: SpecType) -> Option<&SpeEntry> {
         self.entries
             .iter()
             .find(|entry| entry.spec_type == spec_type)
     }
 
+    /// Iterates all entries matching a given SPE type.
     pub fn entries_of_type(&self, spec_type: SpecType) -> impl Iterator<Item = &SpeEntry> {
         self.entries
             .iter()
@@ -277,7 +289,7 @@ mod tests {
     fn spec_type_roundtrip_known_values() {
         for value in [0_u8, 1, 2, 4, 14, 23] {
             let parsed = SpecType::try_from(value).expect("known type should parse");
-            assert_eq!(parsed.as_u8(), value);
+            assert_eq!(u8::from(parsed), value);
         }
     }
 

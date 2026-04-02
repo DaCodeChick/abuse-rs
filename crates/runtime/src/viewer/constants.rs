@@ -1,5 +1,9 @@
+//! Constants for the legacy debug viewer.
+
+/// Default fallback tile size used when archive tile dimensions are unknown.
 pub const FG_TILE_SIZE: f32 = 32.0;
 
+/// Foreground tile archives loaded in order for tile lookup.
 pub const FG_TILE_SPE_FILES: &[&str] = &[
     "art/fore/foregrnd.spe",
     "art/fore/techno.spe",
@@ -13,6 +17,7 @@ pub const FG_TILE_SPE_FILES: &[&str] = &[
     "art/fore/trees2.spe",
 ];
 
+/// Background tile archives loaded in order for tile lookup.
 pub const BG_TILE_SPE_FILES: &[&str] = &[
     "art/back/backgrnd.spe",
     "art/back/intro.spe",
@@ -24,6 +29,7 @@ pub const BG_TILE_SPE_FILES: &[&str] = &[
     "art/back/galien.spe",
 ];
 
+/// Object sprite archives used by the object render mapper.
 pub const OBJECT_SPE_FILES: &[&str] = &[
     "art/door.spe",
     "art/chars/door.spe",

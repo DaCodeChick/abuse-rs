@@ -1,3 +1,14 @@
+//! Lisp script parser for Abuse startup and object definition files.
+//!
+//! Abuse uses a subset of Lisp for:
+//! - Startup configuration (`addon/twist/startup.lsp`)
+//! - Object behavior definitions (`.lsp` files in `data/lisp/`)
+//! - Level scripting and event handlers
+//!
+//! This parser handles basic forms (lists, symbols, strings, quotes) and
+//! comments. It does not evaluate or execute code; it only parses the
+//! structure for later interpretation.
+
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
@@ -6,6 +17,7 @@ use winnow::error::ContextError;
 use winnow::token::{any, take_till};
 use winnow::{ModalResult, Parser};
 
+/// Errors that can occur during Lisp parsing or loading.
 #[derive(Debug, Error)]
 pub enum LispError {
     #[error("failed to read script at {path}: {source}")]
@@ -22,20 +34,30 @@ pub enum LispError {
     UnterminatedList,
 }
 
+/// A parsed Lisp program consisting of top-level forms.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LispProgram {
     pub forms: Vec<LispExpr>,
 }
 
+/// A single Lisp expression (form).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LispExpr {
+    /// A list of sub-expressions: `(defun foo (x) (+ x 1))`
     List(Vec<LispExpr>),
+    /// An unquoted symbol: `foo`, `+`, `defun`
     Symbol(String),
+    /// A quoted string literal: `"hello"`
     String(String),
+    /// A quoted expression: `'foo` or `'(1 2 3)`
     Quote(Box<LispExpr>),
 }
 
 impl LispProgram {
+    /// Parse a Lisp program from source text.
+    ///
+    /// Returns a `LispProgram` containing all top-level forms, or an error
+    /// if the input is malformed.
     pub fn parse(source: &str) -> Result<Self, LispError> {
         let mut input = source;
         let mut parser = terminated(program, eof);
@@ -54,6 +76,7 @@ impl LispProgram {
         }
     }
 
+    /// Load and parse a Lisp script file from disk.
     pub fn load_file(path: impl AsRef<Path>) -> Result<Self, LispError> {
         let path_ref = path.as_ref();
         let source = std::fs::read_to_string(path_ref).map_err(|source| LispError::Io {
@@ -64,15 +87,17 @@ impl LispProgram {
         Self::parse(&source)
     }
 
+    /// Extract all `(load "path")` targets from the program.
+    ///
+    /// This is used to discover transitive script dependencies during startup.
     pub fn collect_load_targets(&self) -> Vec<String> {
         let mut out = Vec::new();
         for form in &self.forms {
-            if let LispExpr::List(items) = form {
-                if let [LispExpr::Symbol(head), LispExpr::String(target)] = items.as_slice() {
-                    if head == "load" {
-                        out.push(target.clone());
-                    }
-                }
+            if let LispExpr::List(items) = form
+                && let [LispExpr::Symbol(head), LispExpr::String(target)] = items.as_slice()
+                && head == "load"
+            {
+                out.push(target.clone());
             }
         }
         out
