@@ -54,6 +54,11 @@ Viewer controls:
 - Mouse wheel: zoom
 - `Q` / `E`: zoom out / in
 - `F1`: toggle debug HUD
+- `M`: mute/unmute object SFX
+- `-` / `+`: lower/raise object SFX volume
+
+The viewer also plays contextual one-shot legacy SFX when relevant object types are present
+(teleporters, spring, lava, force-field/electric hazards).
 
 Current object rendering includes a mapped subset (eg `TP_DOOR`, `SWITCH_DOOR`,
 `TRAP_DOOR2/3`, `TELE2`, `FORCE_FIELD`, `LIGHTIN`, `STEP`, basic `SWITCH*`) based on

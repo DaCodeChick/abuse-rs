@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 
 use abuse_runtime::AbuseRuntimePlugins;
 use abuse_runtime::data::level::{LevelData, VAR_CUR_FRAME, VAR_X, VAR_Y};
 use abuse_runtime::data::spe::{SpeDirectory, SpecType};
 use bevy::asset::RenderAssetUsages;
+use bevy::audio::Volume;
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::MessageReader;
 use bevy::prelude::*;
@@ -80,6 +82,15 @@ struct LevelViewBounds {
     height: f32,
 }
 
+#[derive(Resource, Debug, Clone)]
+struct AudioState {
+    enabled: bool,
+    volume: f32,
+}
+
+#[derive(Component)]
+struct OneShotAudio;
+
 #[derive(Debug, Clone)]
 struct LegacyTileSet {
     fg_tiles: HashMap<u16, Handle<Image>>,
@@ -106,22 +117,54 @@ impl ObjectSpriteLibrary {
 
 fn main() {
     let level_path = std::env::args().nth(1).map(PathBuf::from);
+    let asset_root = level_path
+        .as_deref()
+        .and_then(derive_data_root)
+        .unwrap_or_else(|| PathBuf::from("assets"))
+        .to_string_lossy()
+        .into_owned();
+
+    let plugins = DefaultPlugins.set(bevy::asset::AssetPlugin {
+        file_path: asset_root,
+        ..default()
+    });
 
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(plugins)
         .insert_resource(ViewerConfig { level_path })
         .insert_resource(HudState { visible: true })
+        .insert_resource(AudioState {
+            enabled: true,
+            volume: 0.45,
+        })
         .add_plugins(AbuseRuntimePlugins)
         .add_systems(Startup, (setup_camera, load_level_view).chain())
-        .add_systems(Update, (camera_controls, toggle_hud_visibility, update_hud))
+        .add_systems(
+            Update,
+            (
+                camera_controls,
+                toggle_hud_visibility,
+                toggle_audio,
+                adjust_audio_volume,
+                sync_audio_volume,
+                update_hud,
+            ),
+        )
         .run();
+}
+
+fn derive_data_root(level_path: &Path) -> Option<PathBuf> {
+    level_path
+        .parent()
+        .and_then(|p| p.parent())
+        .map(PathBuf::from)
 }
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn((Camera2d, ViewerCamera));
 }
 
-fn spawn_hud(commands: &mut Commands, level: &LevelData) {
+fn spawn_hud(commands: &mut Commands, level: &LevelData, audio: &AudioState) {
     let level_name = std::path::Path::new(&level.name)
         .file_name()
         .and_then(|name| name.to_str())
@@ -129,10 +172,12 @@ fn spawn_hud(commands: &mut Commands, level: &LevelData) {
 
     commands.spawn((
         Text::new(format!(
-            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD",
+            "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\naudio: {} ({}%)\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, M mute, -/+ volume",
             level_name,
             level.objects.len(),
             level.lights.len(),
+            if audio.enabled { "on" } else { "off" },
+            (audio.volume * 100.0).round() as i32,
         )),
         Node {
             position_type: PositionType::Absolute,
@@ -150,6 +195,8 @@ fn spawn_hud(commands: &mut Commands, level: &LevelData) {
 fn load_level_view(
     mut commands: Commands,
     config: Res<ViewerConfig>,
+    audio_state: Res<AudioState>,
+    asset_server: Res<AssetServer>,
     mut images: ResMut<Assets<Image>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
     mut camera_query: Query<&mut Transform, With<ViewerCamera>>,
@@ -174,6 +221,8 @@ fn load_level_view(
     let object_sprites = load_object_sprite_library(level_path, &mut images)
         .inspect_err(|err| warn!("Object sprite library failed to load: {err}"))
         .ok();
+
+    spawn_context_audio(&mut commands, &asset_server, &audio_state, &level);
 
     let fg_tile_size = tile_set
         .as_ref()
@@ -318,7 +367,103 @@ fn load_level_view(
         level.lights.len()
     );
 
-    spawn_hud(&mut commands, &level);
+    spawn_hud(&mut commands, &level, &audio_state);
+}
+
+fn spawn_context_audio(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    audio_state: &AudioState,
+    level: &LevelData,
+) {
+    if !audio_state.enabled || audio_state.volume <= 0.0 {
+        return;
+    }
+
+    let mut has_tp_door = false;
+    let mut has_tele2 = false;
+    let mut has_spring = false;
+    let mut has_lava = false;
+    let mut has_force_field = false;
+
+    for object in &level.objects {
+        if let Some(name) = object.type_name.as_deref() {
+            match name {
+                "TP_DOOR" | "NEXT_LEVEL" | "NEXT_LEVEL_TOP" => has_tp_door = true,
+                "TELE2" | "TELE_BEAM" => has_tele2 = true,
+                "SPRING" => has_spring = true,
+                "LAVA" => has_lava = true,
+                "FORCE_FIELD" | "LIGHTIN" => has_force_field = true,
+                _ => {}
+            }
+        }
+    }
+
+    if has_tp_door {
+        spawn_one_shot(
+            commands,
+            asset_server,
+            "sfx/telept01.wav",
+            audio_state.volume * 0.45,
+            Some(1.8),
+        );
+    }
+    if has_tele2 {
+        spawn_one_shot(
+            commands,
+            asset_server,
+            "sfx/fadeon01.wav",
+            audio_state.volume * 0.38,
+            Some(1.6),
+        );
+    }
+    if has_spring {
+        spawn_one_shot(
+            commands,
+            asset_server,
+            "sfx/spring03.wav",
+            audio_state.volume * 0.35,
+            Some(1.0),
+        );
+    }
+    if has_lava {
+        spawn_one_shot(
+            commands,
+            asset_server,
+            "sfx/lava01.wav",
+            audio_state.volume * 0.3,
+            Some(1.4),
+        );
+    }
+    if has_force_field {
+        spawn_one_shot(
+            commands,
+            asset_server,
+            "sfx/force01.wav",
+            audio_state.volume * 0.32,
+            Some(1.2),
+        );
+    }
+}
+
+fn spawn_one_shot(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    path: &'static str,
+    volume: f32,
+    max_duration_secs: Option<f32>,
+) {
+    let mut settings =
+        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(volume.clamp(0.0, 1.0)));
+    if let Some(seconds) = max_duration_secs {
+        settings = settings.with_duration(Duration::from_secs_f32(seconds.max(0.05)));
+    }
+
+    commands.spawn((
+        AudioPlayer::new(asset_server.load(path)),
+        settings,
+        OneShotAudio,
+    ));
 }
 
 fn object_render_adjustment(type_name: Option<&str>) -> (f32, f32, f32) {
@@ -533,6 +678,7 @@ fn camera_controls(
 
 fn update_hud(
     hud_state: Res<HudState>,
+    audio_state: Res<AudioState>,
     camera_query: Query<&Transform, With<ViewerCamera>>,
     mut hud_query: Query<&mut Text, With<ViewerHud>>,
 ) {
@@ -555,14 +701,62 @@ fn update_hud(
     let _old_zoom = lines.next();
     let objects_line = lines.next().unwrap_or("objects: ?");
     let lights_line = lines.next().unwrap_or("lights: ?");
+    let _old_audio = lines.next();
     let controls_line = lines
         .next()
-        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD");
+        .unwrap_or("controls: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, M mute, -/+ volume");
 
     text.0 = format!(
-        "{}\nzoom: {}%\n{}\n{}\n{}",
-        level_line, zoom_percent, objects_line, lights_line, controls_line
+        "{}\nzoom: {}%\n{}\n{}\naudio: {} ({}%)\n{}",
+        level_line,
+        zoom_percent,
+        objects_line,
+        lights_line,
+        if audio_state.enabled { "on" } else { "off" },
+        (audio_state.volume * 100.0).round() as i32,
+        controls_line,
     );
+}
+
+fn toggle_audio(keyboard: Res<ButtonInput<KeyCode>>, mut audio_state: ResMut<AudioState>) {
+    if keyboard.just_pressed(KeyCode::KeyM) {
+        audio_state.enabled = !audio_state.enabled;
+    }
+}
+
+fn adjust_audio_volume(keyboard: Res<ButtonInput<KeyCode>>, mut audio_state: ResMut<AudioState>) {
+    let mut changed = false;
+    if keyboard.just_pressed(KeyCode::Minus) || keyboard.just_pressed(KeyCode::NumpadSubtract) {
+        audio_state.volume = (audio_state.volume - 0.05).clamp(0.0, 1.0);
+        changed = true;
+    }
+    if keyboard.just_pressed(KeyCode::Equal) || keyboard.just_pressed(KeyCode::NumpadAdd) {
+        audio_state.volume = (audio_state.volume + 0.05).clamp(0.0, 1.0);
+        changed = true;
+    }
+
+    if changed && audio_state.volume <= 0.0 {
+        audio_state.enabled = false;
+    } else if changed {
+        audio_state.enabled = true;
+    }
+}
+
+fn sync_audio_volume(
+    audio_state: Res<AudioState>,
+    mut oneshots: Query<&mut AudioSink, With<OneShotAudio>>,
+) {
+    if !audio_state.is_changed() {
+        return;
+    }
+
+    for mut sink in &mut oneshots {
+        sink.set_volume(if audio_state.enabled {
+            Volume::Linear((audio_state.volume * 0.5).clamp(0.0, 1.0))
+        } else {
+            Volume::SILENT
+        });
+    }
 }
 
 fn toggle_hud_visibility(
