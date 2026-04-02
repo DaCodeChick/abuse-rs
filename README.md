@@ -36,6 +36,22 @@ cargo run -p abuse-game
 Current executable is a bootstrap app; gameplay systems and data loading are staged in
 the plan.
 
+Level viewer mode:
+
+```bash
+cargo run -p abuse-game -- /path/to/levels/level00.spe
+```
+
+This renders a debug view of FG/BG tiles plus object/light markers from parsed legacy
+level data.
+
+Viewer controls:
+
+- `WASD` or arrow keys: pan
+- Mouse wheel: zoom
+- `Q` / `E`: zoom out / in
+- `F1`: toggle debug HUD
+
 Lisp bootstrap tooling is available:
 
 ```bash

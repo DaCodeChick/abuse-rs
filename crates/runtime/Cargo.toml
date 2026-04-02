@@ -8,3 +8,4 @@ anyhow.workspace = true
 bevy.workspace = true
 thiserror.workspace = true
 winnow.workspace = true
+byteorder.workspace = true
