@@ -12,7 +12,6 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::data::spe::{SpeDirectory, SpecType};
-use crate::viewer::constants::{BG_TILE_SPE_FILES, FG_TILE_SPE_FILES, OBJECT_SPE_FILES};
 
 /// In-memory FG/BG tile texture lookup tables with discovered tile dimensions.
 #[derive(Debug, Clone)]
@@ -46,9 +45,11 @@ impl ObjectSpriteLibrary {
     }
 }
 
-/// Loads foreground/background tile textures from known legacy archives.
+/// Loads foreground/background tile textures from provided archive paths.
 pub fn load_legacy_tile_set(
     level_path: &Path,
+    fg_tile_paths: &[&str],
+    bg_tile_paths: &[&str],
     images: &mut Assets<Image>,
     fallback_tile_size: f32,
 ) -> Result<LegacyTileSet, String> {
@@ -62,7 +63,7 @@ pub fn load_legacy_tile_set(
     let mut fg_tile_size = Vec2::new(fallback_tile_size, fallback_tile_size);
     let mut bg_tile_size = Vec2::new(fallback_tile_size, fallback_tile_size);
 
-    for rel_path in FG_TILE_SPE_FILES {
+    for rel_path in fg_tile_paths {
         let path = data_root.join(rel_path);
         if !path.exists() {
             continue;
@@ -75,7 +76,7 @@ pub fn load_legacy_tile_set(
         }
     }
 
-    for rel_path in BG_TILE_SPE_FILES {
+    for rel_path in bg_tile_paths {
         let path = data_root.join(rel_path);
         if !path.exists() {
             continue;
@@ -100,9 +101,10 @@ pub fn load_legacy_tile_set(
     })
 }
 
-/// Loads mapped object sprite textures from known object archives.
+/// Loads mapped object sprite textures from provided archive paths.
 pub fn load_object_sprite_library(
     level_path: &Path,
+    object_spe_paths: &[&str],
     images: &mut Assets<Image>,
 ) -> Result<ObjectSpriteLibrary, String> {
     let data_root = derive_data_root(level_path)
@@ -110,7 +112,7 @@ pub fn load_object_sprite_library(
     let fallback_palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
 
     let mut sprites = HashMap::new();
-    for rel in OBJECT_SPE_FILES {
+    for rel in object_spe_paths {
         let path = data_root.join(rel);
         if !path.exists() {
             continue;

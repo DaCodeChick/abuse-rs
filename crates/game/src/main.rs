@@ -22,6 +22,48 @@ use abuse_runtime::viewer::scene::{spawn_bg_tiles, spawn_fg_tiles, spawn_lights,
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
+/// Foreground tile archives loaded in order for tile lookup.
+const FG_TILE_SPE_FILES: &[&str] = &[
+    "art/fore/foregrnd.spe",
+    "art/fore/techno.spe",
+    "art/fore/techno2.spe",
+    "art/fore/techno3.spe",
+    "art/fore/techno4.spe",
+    "art/fore/cave.spe",
+    "art/fore/alien.spe",
+    "art/fore/trees.spe",
+    "art/fore/endgame.spe",
+    "art/fore/trees2.spe",
+];
+
+/// Background tile archives loaded in order for tile lookup.
+const BG_TILE_SPE_FILES: &[&str] = &[
+    "art/back/backgrnd.spe",
+    "art/back/intro.spe",
+    "art/back/city.spe",
+    "art/back/cave.spe",
+    "art/back/tech.spe",
+    "art/back/alienb.spe",
+    "art/back/green2.spe",
+    "art/back/galien.spe",
+];
+
+/// Object sprite archives used by the object render mapper.
+const OBJECT_SPE_FILES: &[&str] = &[
+    "art/door.spe",
+    "art/chars/door.spe",
+    "art/chars/tdoor.spe",
+    "art/chars/teleport.spe",
+    "art/chars/platform.spe",
+    "art/chars/lightin.spe",
+    "art/chars/lava.spe",
+    "art/chars/step.spe",
+    "art/ball.spe",
+    "art/compass.spe",
+    "art/rob2.spe",
+    "art/misc.spe",
+];
+
 /// Command-line configuration for the viewer executable.
 #[derive(Resource, Debug, Clone)]
 struct ViewerConfig {
@@ -88,11 +130,17 @@ fn load_level_view(
         }
     };
 
-    let tile_set = load_legacy_tile_set(level_path, &mut images, FG_TILE_SIZE)
-        .inspect_err(|err| warn!("Tile asset loading failed, falling back to debug colors: {err}"))
-        .ok();
+    let tile_set = load_legacy_tile_set(
+        level_path,
+        FG_TILE_SPE_FILES,
+        BG_TILE_SPE_FILES,
+        &mut images,
+        FG_TILE_SIZE,
+    )
+    .inspect_err(|err| warn!("Tile asset loading failed, falling back to debug colors: {err}"))
+    .ok();
 
-    let object_sprites = load_object_sprite_library(level_path, &mut images)
+    let object_sprites = load_object_sprite_library(level_path, OBJECT_SPE_FILES, &mut images)
         .inspect_err(|err| warn!("Object sprite library failed to load: {err}"))
         .ok();
 
