@@ -52,6 +52,7 @@ Acceptance:
 
 ### M4 - Script Bootstrap Compatibility
 
+- [x] Add initial Lisp parser and startup load extraction.
 - [ ] Load startup script assets and defaults.
 - [ ] Implement minimal builtin subset required for boot flow.
 - [ ] Provide diagnostics for missing symbols/functions.
@@ -80,7 +81,7 @@ Acceptance:
 
 ## References
 
-- Legacy source root: `/home/admin/Downloads/abuse-0.8`
+- Legacy source root: local path provided at runtime
 - Key files:
   - `src/imlib/specs.h`
   - `src/imlib/specs.cpp`

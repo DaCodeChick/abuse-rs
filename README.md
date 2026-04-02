@@ -11,8 +11,7 @@ This repository is currently in bootstrap phase:
 
 - Workspace and crate layout are in place.
 - Implementation details are tracked in `PLAN.md`.
-- Legacy source reference is expected at:
-  `/home/admin/Downloads/abuse-0.8`
+- Legacy source files are expected to be available locally.
 
 ## Repository Layout
 
@@ -38,6 +37,14 @@ cargo run -p abuse-game
 
 Current executable is a bootstrap app; gameplay systems and data loading are staged in
 the plan.
+
+Lisp bootstrap tooling is available:
+
+```bash
+cargo run -p abuse-tools -- lisp-loads /path/to/abuse.lsp
+```
+
+This parses a Lisp file and lists the discovered `(load "...")` dependencies.
 
 ## Non-Goals (for now)
 
