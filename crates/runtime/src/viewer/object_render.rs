@@ -1,6 +1,6 @@
 //! Object sprite resolution and placement helpers.
 
-use crate::data::level::{LoadedObject, VAR_CUR_FRAME};
+use crate::data::level::{LoadedObject, ObjectVar};
 
 /// Returns draw offset and depth for known object classes.
 pub fn object_render_adjustment(type_name: Option<&str>) -> (f32, f32, f32) {
@@ -21,7 +21,7 @@ pub fn object_render_adjustment(type_name: Option<&str>) -> (f32, f32, f32) {
 pub fn resolve_object_sprite(object: &LoadedObject) -> Option<(&'static str, String)> {
     let type_name = object.type_name.as_deref()?;
     let state_name = object.state_name.as_deref().unwrap_or("stopped");
-    let frame = object.var(VAR_CUR_FRAME).unwrap_or(0).max(0) as usize;
+    let frame = object.var(ObjectVar::CurFrame).unwrap_or(0).max(0) as usize;
 
     match type_name {
         "TP_DOOR" => {

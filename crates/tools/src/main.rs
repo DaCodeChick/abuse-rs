@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use abuse_runtime::data::level::{LevelData, VAR_HP, VAR_X, VAR_Y};
+use abuse_runtime::data::level::{LevelData, ObjectVar};
 use abuse_runtime::data::lisp::LispProgram;
 use abuse_runtime::data::spe::SpeDirectory;
 use serde::Serialize;
@@ -198,9 +198,9 @@ fn main() {
 
                     println!("objects_loaded: {}", level.objects.len());
                     for (idx, object) in level.objects.iter().take(5).enumerate() {
-                        let x = object.var(VAR_X).unwrap_or(0);
-                        let y = object.var(VAR_Y).unwrap_or(0);
-                        let hp = object.var(VAR_HP).unwrap_or(0);
+                        let x = object.var(ObjectVar::X).unwrap_or(0);
+                        let y = object.var(ObjectVar::Y).unwrap_or(0);
+                        let hp = object.var(ObjectVar::Hp).unwrap_or(0);
                         println!(
                             "  obj[{idx}] type={}({}) state={}({}) x={} y={} hp={} lvars={}",
                             object.type_id,
@@ -324,9 +324,9 @@ fn create_level_dump(level: &LevelData) -> LevelDump {
             state_id: obj.state_id,
             type_name: obj.type_name.clone(),
             state_name: obj.state_name.clone(),
-            x: obj.var(VAR_X).unwrap_or(0),
-            y: obj.var(VAR_Y).unwrap_or(0),
-            hp: obj.var(VAR_HP).unwrap_or(0),
+            x: obj.var(ObjectVar::X).unwrap_or(0),
+            y: obj.var(ObjectVar::Y).unwrap_or(0),
+            hp: obj.var(ObjectVar::Hp).unwrap_or(0),
             lvars_count: obj.lvars.len(),
         })
         .collect();

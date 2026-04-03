@@ -5,7 +5,7 @@
 
 use bevy::prelude::*;
 
-use crate::data::level::{LevelData, VAR_X, VAR_Y};
+use crate::data::level::{LevelData, ObjectVar};
 
 use super::assets::{LegacyTileSet, ObjectSpriteLibrary};
 use super::object_render::{object_render_adjustment, resolve_object_sprite};
@@ -102,8 +102,8 @@ pub fn spawn_objects(
         if let Some((spe_rel, entry_name)) = resolve_object_sprite(object)
             && let Some(texture) = sprite_lib.get(spe_rel, &entry_name)
         {
-            let x = object.var(VAR_X).unwrap_or(0) as f32 - fg_world_w * 0.5;
-            let mut y = fg_world_h * 0.5 - object.var(VAR_Y).unwrap_or(0) as f32;
+            let x = object.var(ObjectVar::X).unwrap_or(0) as f32 - fg_world_w * 0.5;
+            let mut y = fg_world_h * 0.5 - object.var(ObjectVar::Y).unwrap_or(0) as f32;
             if let Some(image) = images.get(&texture) {
                 y += image.height() as f32 * 0.5;
             }

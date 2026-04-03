@@ -104,6 +104,7 @@ impl LispProgram {
     }
 }
 
+/// Parses a complete Lisp program (sequence of top-level forms).
 fn program(input: &mut &str) -> ModalResult<Vec<LispExpr>, ContextError> {
     preceded(
         ws_and_comments,
@@ -112,6 +113,7 @@ fn program(input: &mut &str) -> ModalResult<Vec<LispExpr>, ContextError> {
     .parse_next(input)
 }
 
+/// Parses a single Lisp expression (can be a list, symbol, string, or quote).
 fn expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     preceded(
         ws_and_comments,
@@ -120,6 +122,7 @@ fn expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     .parse_next(input)
 }
 
+/// Parses a list expression: `(expr1 expr2 ...)`.
 fn list_expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     delimited(
         '(',
@@ -130,18 +133,23 @@ fn list_expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     .parse_next(input)
 }
 
+/// Parses a quoted expression: `'expr`.
 fn quote_expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     preceded('\'', expr)
         .map(|inner| LispExpr::Quote(Box::new(inner)))
         .parse_next(input)
 }
 
+/// Parses a string literal: `"text with \"escapes\""`.
 fn string_expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     delimited('"', string_body, '"')
         .map(LispExpr::String)
         .parse_next(input)
 }
 
+/// Parses the contents of a string literal, handling escape sequences.
+///
+/// Supports standard escapes: `\"`, `\\`, `\n`, `\r`, `\t`.
 fn string_body(input: &mut &str) -> ModalResult<String, ContextError> {
     let mut output = String::new();
 
@@ -167,12 +175,16 @@ fn string_body(input: &mut &str) -> ModalResult<String, ContextError> {
     }
 }
 
+/// Parses an unquoted symbol (identifier or operator).
+///
+/// Symbols terminate at whitespace, parentheses, quotes, or semicolons.
 fn symbol_expr(input: &mut &str) -> ModalResult<LispExpr, ContextError> {
     take_till(1.., is_symbol_terminator)
         .map(|s: &str| LispExpr::Symbol(s.to_string()))
         .parse_next(input)
 }
 
+/// Consumes whitespace and line comments (`;` to end of line).
 fn ws_and_comments(input: &mut &str) -> ModalResult<(), ContextError> {
     loop {
         let before = *input;
@@ -197,10 +209,14 @@ fn ws_and_comments(input: &mut &str) -> ModalResult<(), ContextError> {
     Ok(())
 }
 
+/// Returns true if a character terminates a symbol.
 fn is_symbol_terminator(c: char) -> bool {
     c.is_ascii_whitespace() || matches!(c, '(' | ')' | ';' | '"' | '\'')
 }
 
+/// Detects unterminated string literals in source code.
+///
+/// Used for providing better error messages when parsing fails.
 fn has_unterminated_string(source: &str) -> bool {
     let mut in_string = false;
     let mut escaped = false;
@@ -237,6 +253,10 @@ fn has_unterminated_string(source: &str) -> bool {
     in_string
 }
 
+/// Detects unmatched parentheses in source code.
+///
+/// Used for providing better error messages when parsing fails.
+/// Returns true if there are unclosed `(` or unmatched `)`.
 fn has_unmatched_list(source: &str) -> bool {
     let mut depth = 0_i32;
     let mut in_string = false;

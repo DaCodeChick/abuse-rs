@@ -1,3 +1,9 @@
+//! Level data loading and parsing.
+//!
+//! This module provides functionality for loading game level data from binary files
+//! that use the SPE (Special Purpose Entry) directory format. It handles parsing of
+//! tilemaps, game objects, lighting, and their interconnections.
+
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -7,150 +13,357 @@ use thiserror::Error;
 
 use crate::data::spe::{SpeDirectory, SpeError};
 
-const RC_8: u8 = 0;
-const RC_16: u8 = 1;
-const RC_32: u8 = 2;
-const TOTAL_OBJECT_VARS: usize = 28;
+/// Record type markers used in the binary level format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum RecordType {
+    /// 8-bit record type.
+    U8 = 0,
+    /// 16-bit record type.
+    U16 = 1,
+    /// 32-bit record type.
+    U32 = 2,
+}
 
-const OBJECT_VAR_SPECS: [(&str, u8); TOTAL_OBJECT_VARS] = [
-    ("fade_dir", RC_8),
-    ("frame_dir", RC_8),
-    ("direction", RC_8),
-    ("gravity_on", RC_8),
-    ("fade_count", RC_8),
-    ("fade_max", RC_8),
-    ("active", RC_8),
-    ("flags", RC_8),
-    ("aitype", RC_8),
-    ("xvel", RC_32),
-    ("fxvel", RC_8),
-    ("yvel", RC_32),
-    ("fyvel", RC_8),
-    ("xacel", RC_32),
-    ("fxacel", RC_8),
-    ("yacel", RC_32),
-    ("fyacel", RC_8),
-    ("x", RC_32),
-    ("fx", RC_8),
-    ("y", RC_32),
-    ("fy", RC_8),
-    ("hp", RC_16),
-    ("mp", RC_16),
-    ("fmp", RC_16),
-    ("cur_frame", RC_16),
-    ("aistate", RC_16),
-    ("aistate_time", RC_16),
-    ("targetable", RC_8),
+impl RecordType {
+    /// Converts a u8 value to a RecordType.
+    ///
+    /// # Errors
+    ///
+    /// Returns `None` if the value is not a valid record type marker.
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::U8),
+            1 => Some(Self::U16),
+            2 => Some(Self::U32),
+            _ => None,
+        }
+    }
+}
+
+impl From<RecordType> for u8 {
+    fn from(rt: RecordType) -> Self {
+        rt as u8
+    }
+}
+
+/// Object variable indices for accessing standard object properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(usize)]
+pub enum ObjectVar {
+    /// Fade direction.
+    FadeDir = 0,
+    /// Frame direction.
+    FrameDir = 1,
+    /// Movement direction.
+    Direction = 2,
+    /// Whether gravity is enabled.
+    GravityOn = 3,
+    /// Current fade counter.
+    FadeCount = 4,
+    /// Maximum fade value.
+    FadeMax = 5,
+    /// Whether object is active.
+    Active = 6,
+    /// Object flags.
+    Flags = 7,
+    /// AI type identifier.
+    AiType = 8,
+    /// Horizontal velocity (integer part).
+    XVel = 9,
+    /// Horizontal velocity (fractional part).
+    FxVel = 10,
+    /// Vertical velocity (integer part).
+    YVel = 11,
+    /// Vertical velocity (fractional part).
+    FyVel = 12,
+    /// Horizontal acceleration (integer part).
+    XAcel = 13,
+    /// Horizontal acceleration (fractional part).
+    FxAcel = 14,
+    /// Vertical acceleration (integer part).
+    YAcel = 15,
+    /// Vertical acceleration (fractional part).
+    FyAcel = 16,
+    /// X-coordinate (integer part).
+    X = 17,
+    /// X-coordinate (fractional part).
+    Fx = 18,
+    /// Y-coordinate (integer part).
+    Y = 19,
+    /// Y-coordinate (fractional part).
+    Fy = 20,
+    /// Health points.
+    Hp = 21,
+    /// Magic/mana points.
+    Mp = 22,
+    /// Magic/mana points (fractional part).
+    Fmp = 23,
+    /// Current animation frame.
+    CurFrame = 24,
+    /// AI state identifier.
+    AiState = 25,
+    /// Time in current AI state.
+    AiStateTime = 26,
+    /// Whether object can be targeted.
+    Targetable = 27,
+}
+
+impl ObjectVar {
+    /// Returns the total number of object variables.
+    pub const fn count() -> usize {
+        28
+    }
+
+    /// Converts a usize index to an ObjectVar.
+    ///
+    /// # Errors
+    ///
+    /// Returns `None` if the index is out of range.
+    pub fn from_usize(value: usize) -> Option<Self> {
+        match value {
+            0 => Some(Self::FadeDir),
+            1 => Some(Self::FrameDir),
+            2 => Some(Self::Direction),
+            3 => Some(Self::GravityOn),
+            4 => Some(Self::FadeCount),
+            5 => Some(Self::FadeMax),
+            6 => Some(Self::Active),
+            7 => Some(Self::Flags),
+            8 => Some(Self::AiType),
+            9 => Some(Self::XVel),
+            10 => Some(Self::FxVel),
+            11 => Some(Self::YVel),
+            12 => Some(Self::FyVel),
+            13 => Some(Self::XAcel),
+            14 => Some(Self::FxAcel),
+            15 => Some(Self::YAcel),
+            16 => Some(Self::FyAcel),
+            17 => Some(Self::X),
+            18 => Some(Self::Fx),
+            19 => Some(Self::Y),
+            20 => Some(Self::Fy),
+            21 => Some(Self::Hp),
+            22 => Some(Self::Mp),
+            23 => Some(Self::Fmp),
+            24 => Some(Self::CurFrame),
+            25 => Some(Self::AiState),
+            26 => Some(Self::AiStateTime),
+            27 => Some(Self::Targetable),
+            _ => None,
+        }
+    }
+}
+
+impl From<ObjectVar> for usize {
+    fn from(var: ObjectVar) -> Self {
+        var as usize
+    }
+}
+
+/// Total number of predefined object variables.
+const TOTAL_OBJECT_VARS: usize = ObjectVar::count();
+
+/// Specifications for object variable entries in the level file.
+///
+/// Each entry specifies the variable name and its storage type (8-bit, 16-bit, or 32-bit).
+/// The order of entries in this array determines the variable index.
+const OBJECT_VAR_SPECS: [(&str, RecordType); TOTAL_OBJECT_VARS] = [
+    ("fade_dir", RecordType::U8),
+    ("frame_dir", RecordType::U8),
+    ("direction", RecordType::U8),
+    ("gravity_on", RecordType::U8),
+    ("fade_count", RecordType::U8),
+    ("fade_max", RecordType::U8),
+    ("active", RecordType::U8),
+    ("flags", RecordType::U8),
+    ("aitype", RecordType::U8),
+    ("xvel", RecordType::U32),
+    ("fxvel", RecordType::U8),
+    ("yvel", RecordType::U32),
+    ("fyvel", RecordType::U8),
+    ("xacel", RecordType::U32),
+    ("fxacel", RecordType::U8),
+    ("yacel", RecordType::U32),
+    ("fyacel", RecordType::U8),
+    ("x", RecordType::U32),
+    ("fx", RecordType::U8),
+    ("y", RecordType::U32),
+    ("fy", RecordType::U8),
+    ("hp", RecordType::U16),
+    ("mp", RecordType::U16),
+    ("fmp", RecordType::U16),
+    ("cur_frame", RecordType::U16),
+    ("aistate", RecordType::U16),
+    ("aistate_time", RecordType::U16),
+    ("targetable", RecordType::U8),
 ];
 
-pub const VAR_X: usize = 17;
-pub const VAR_Y: usize = 19;
-pub const VAR_CUR_FRAME: usize = 24;
-pub const VAR_HP: usize = 21;
-pub const VAR_AITYPE: usize = 8;
-pub const VAR_XVEL: usize = 9;
-pub const VAR_YVEL: usize = 11;
-pub const VAR_XACEL: usize = 13;
-pub const VAR_YACEL: usize = 15;
-pub const VAR_TARGETABLE: usize = 27;
-
+/// Represents a complete game level with all its components.
 #[derive(Debug, Clone)]
 pub struct LevelData {
+    /// Display name or path of the level.
     pub name: String,
+    /// Optional first name field (purpose varies by level format).
     pub first_name: Option<String>,
+    /// Width of the foreground tilemap in tiles.
     pub fg_width: u32,
+    /// Height of the foreground tilemap in tiles.
     pub fg_height: u32,
+    /// Foreground tile indices (row-major order).
     pub fg_tiles: Vec<u16>,
+    /// Width of the background tilemap in tiles.
     pub bg_width: u32,
+    /// Height of the background tilemap in tiles.
     pub bg_height: u32,
+    /// Background tile indices (row-major order).
     pub bg_tiles: Vec<u16>,
+    /// Background horizontal scroll rate multiplier.
     pub bg_xmul: u32,
+    /// Background horizontal scroll rate divisor.
     pub bg_xdiv: u32,
+    /// Background vertical scroll rate multiplier.
     pub bg_ymul: u32,
+    /// Background vertical scroll rate divisor.
     pub bg_ydiv: u32,
+    /// Number of objects in the level (if specified).
     pub object_count: Option<u32>,
+    /// All game objects in the level.
     pub objects: Vec<LoadedObject>,
+    /// Names of all object types.
     pub object_type_names: Vec<String>,
+    /// State names for each object type.
     pub object_state_names: Vec<Vec<String>>,
+    /// Minimum light level for the entire level.
     pub min_light_level: Option<u32>,
+    /// All light sources in the level.
     pub lights: Vec<LoadedLight>,
+    /// Relationships between objects.
     pub object_links: Vec<ObjectLink>,
+    /// Relationships between objects and lights.
     pub light_links: Vec<LightLink>,
 }
 
+/// Represents a game object loaded from a level file.
 #[derive(Debug, Clone)]
 pub struct LoadedObject {
+    /// Numeric identifier for the object's type.
     pub type_id: u16,
+    /// Numeric identifier for the object's current state.
     pub state_id: u16,
+    /// Human-readable type name (if available).
     pub type_name: Option<String>,
+    /// Human-readable state name (if available).
     pub state_name: Option<String>,
+    /// Level-specific variables (lvars) for this object.
     pub lvars: Vec<i32>,
+    /// Standard object variables (position, velocity, etc.).
     pub vars: [i32; TOTAL_OBJECT_VARS],
 }
 
+/// Represents a light source in the level.
 #[derive(Debug, Clone)]
 pub struct LoadedLight {
+    /// Type of light source.
     pub light_type: u8,
+    /// X-coordinate of the light.
     pub x: i32,
+    /// Y-coordinate of the light.
     pub y: i32,
+    /// Horizontal offset for light positioning.
     pub xshift: i32,
+    /// Vertical offset for light positioning.
     pub yshift: i32,
+    /// Inner radius where light is at full intensity.
     pub inner_radius: i32,
+    /// Outer radius where light fades to zero.
     pub outer_radius: i32,
 }
 
+/// Links one object to another object.
 #[derive(Debug, Clone)]
 pub struct ObjectLink {
+    /// Index of the source object.
     pub from_object: i32,
+    /// Index of the target object.
     pub to_object: i32,
 }
 
+/// Links an object to a light source.
 #[derive(Debug, Clone)]
 pub struct LightLink {
+    /// Index of the object.
     pub from_object: i32,
+    /// Index of the light source.
     pub to_light: i32,
 }
 
 impl LoadedObject {
-    pub fn var(&self, index: usize) -> Option<i32> {
-        self.vars.get(index).copied()
+    /// Retrieves the value of a standard object variable by index.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The variable to retrieve
+    ///
+    /// # Returns
+    ///
+    /// The variable value if the index is valid, or `None` otherwise.
+    pub fn var(&self, var: ObjectVar) -> Option<i32> {
+        self.vars.get(var as usize).copied()
     }
 }
 
+/// Errors that can occur when loading level data.
 #[derive(Debug, Error)]
 pub enum LevelError {
+    /// Failed to open the level file.
     #[error("failed to open level file at {path}: {source}")]
     Open {
         path: std::path::PathBuf,
         #[source]
         source: std::io::Error,
     },
+    /// Failed to read from the level file.
     #[error("failed to read level file at {path}: {source}")]
     Read {
         path: std::path::PathBuf,
         #[source]
         source: std::io::Error,
     },
+    /// Failed to parse the SPE directory structure.
     #[error("failed to parse level spe directory: {source}")]
     Spe {
         #[from]
         source: SpeError,
     },
+    /// A required entry is missing from the level file.
     #[error("missing mandatory entry: {entry}")]
     MissingEntry { entry: &'static str },
+    /// Tile count overflowed when multiplying dimensions.
     #[error("map tile count overflow for dimensions {width}x{height}")]
     TileCountOverflow { width: u32, height: u32 },
+    /// String data contains invalid UTF-8.
     #[error("invalid utf-8 string in entry {entry}")]
     InvalidString { entry: &'static str },
-    #[error("invalid object array marker for {entry}: expected {expected}, got {actual}")]
+    /// Object array has an unexpected type marker.
+    #[error("invalid object array marker for {entry}: expected {expected:?}, got {actual}")]
     InvalidObjectArrayMarker {
         entry: &'static str,
-        expected: u8,
+        expected: RecordType,
         actual: u8,
     },
 }
 
 impl LevelData {
+    /// Opens and parses a level file from the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the level file
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LevelError`] if the file cannot be opened, read, or parsed.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, LevelError> {
         let path_ref = path.as_ref();
         let directory = SpeDirectory::open_lenient(path_ref)?;
@@ -213,6 +426,11 @@ impl LevelData {
     }
 }
 
+/// Reads light data from the level file.
+///
+/// # Returns
+///
+/// A tuple containing the minimum light level (if present) and a vector of lights.
 fn read_lights(
     directory: &SpeDirectory,
     file: &mut File,
@@ -298,6 +516,7 @@ fn read_lights(
     Ok((Some(min_light_level), lights))
 }
 
+/// Reads object-to-object link data from the level file.
 fn read_object_links(
     directory: &SpeDirectory,
     file: &mut File,
@@ -317,10 +536,10 @@ fn read_object_links(
         path: path.to_path_buf(),
         source,
     })?;
-    if marker != RC_32 {
+    if marker != RecordType::U32 as u8 {
         return Err(LevelError::InvalidObjectArrayMarker {
             entry: "object_links",
-            expected: RC_32,
+            expected: RecordType::U32,
             actual: marker,
         });
     }
@@ -355,6 +574,7 @@ fn read_object_links(
     Ok(links)
 }
 
+/// Reads object-to-light link data from the level file.
 fn read_light_links(
     directory: &SpeDirectory,
     file: &mut File,
@@ -374,10 +594,10 @@ fn read_light_links(
         path: path.to_path_buf(),
         source,
     })?;
-    if marker != RC_32 {
+    if marker != RecordType::U32 as u8 {
         return Err(LevelError::InvalidObjectArrayMarker {
             entry: "light_links",
-            expected: RC_32,
+            expected: RecordType::U32,
             actual: marker,
         });
     }
@@ -412,6 +632,9 @@ fn read_light_links(
     Ok(links)
 }
 
+/// Reads all object data from the level file.
+///
+/// Combines type IDs, state IDs, lvars, and vars into complete object structures.
 fn read_objects(
     directory: &SpeDirectory,
     file: &mut File,
@@ -428,8 +651,8 @@ fn read_objects(
         height: 1,
     })?;
 
-    let type_ids = read_object_u16_array(directory, file, path, "type", RC_16, total)?;
-    let state_ids = read_object_u16_array(directory, file, path, "state", RC_16, total)?;
+    let type_ids = read_object_u16_array(directory, file, path, "type", RecordType::U16, total)?;
+    let state_ids = read_object_u16_array(directory, file, path, "state", RecordType::U16, total)?;
     let lvars = read_object_lvars(directory, file, path, total)?;
     let vars = read_object_vars(directory, file, path, total)?;
 
@@ -451,6 +674,13 @@ fn read_objects(
     Ok(objects)
 }
 
+/// Reads object type and state name descriptions from the level file.
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - Vector of object type names
+/// - Vector of vectors where each inner vector contains state names for that type
 fn read_object_descriptions(
     directory: &SpeDirectory,
     file: &mut File,
@@ -520,6 +750,10 @@ fn read_object_descriptions(
     Ok((type_names, state_names))
 }
 
+/// Reads a length-prefixed string from the current file position.
+///
+/// The string format is: 1 byte length, followed by that many bytes of data.
+/// Trailing null bytes are removed.
 fn read_cursor_len_prefixed_string(
     file: &mut File,
     path: &Path,
@@ -543,12 +777,19 @@ fn read_cursor_len_prefixed_string(
     String::from_utf8(bytes).map_err(|_| LevelError::InvalidString { entry: entry_name })
 }
 
+/// Reads an array of u16 values for objects from the level file.
+///
+/// # Arguments
+///
+/// * `entry_name` - Name of the directory entry to read
+/// * `expected_marker` - Expected record type marker
+/// * `total` - Number of values to read
 fn read_object_u16_array(
     directory: &SpeDirectory,
     file: &mut File,
     path: &Path,
     entry_name: &'static str,
-    expected_marker: u8,
+    expected_marker: RecordType,
     total: usize,
 ) -> Result<Vec<u16>, LevelError> {
     let Some(entry) = directory.find_by_name(entry_name) else {
@@ -565,7 +806,7 @@ fn read_object_u16_array(
         path: path.to_path_buf(),
         source,
     })?;
-    if marker != expected_marker {
+    if marker != expected_marker as u8 {
         return Err(LevelError::InvalidObjectArrayMarker {
             entry: entry_name,
             expected: expected_marker,
@@ -585,6 +826,9 @@ fn read_object_u16_array(
     Ok(out)
 }
 
+/// Reads level-specific variables (lvars) for all objects.
+///
+/// Each object can have a variable number of lvars stored sequentially.
 fn read_object_lvars(
     directory: &SpeDirectory,
     file: &mut File,
@@ -616,10 +860,10 @@ fn read_object_lvars(
                 path: path.to_path_buf(),
                 source,
             })?;
-            if marker != RC_32 {
+            if marker != RecordType::U32 as u8 {
                 return Err(LevelError::InvalidObjectArrayMarker {
                     entry: "lvars",
-                    expected: RC_32,
+                    expected: RecordType::U32,
                     actual: marker,
                 });
             }
@@ -639,6 +883,10 @@ fn read_object_lvars(
     Ok(all)
 }
 
+/// Reads standard object variables for all objects.
+///
+/// Iterates through all variable types defined in `OBJECT_VAR_SPECS` and reads
+/// their values for each object, handling different storage sizes (8/16/32-bit).
 fn read_object_vars(
     directory: &SpeDirectory,
     file: &mut File,
@@ -662,7 +910,7 @@ fn read_object_vars(
             path: path.to_path_buf(),
             source,
         })?;
-        if marker != *expected_marker {
+        if marker != *expected_marker as u8 {
             return Err(LevelError::InvalidObjectArrayMarker {
                 entry: entry_name,
                 expected: *expected_marker,
@@ -671,24 +919,26 @@ fn read_object_vars(
         }
 
         for object in &mut objects {
-            let value = match marker {
-                RC_8 => i32::from(file.read_u8().map_err(|source| LevelError::Read {
+            let value = match expected_marker {
+                RecordType::U8 => i32::from(file.read_u8().map_err(|source| LevelError::Read {
                     path: path.to_path_buf(),
                     source,
                 })?),
-                RC_16 => i32::from(file.read_u16::<LittleEndian>().map_err(|source| {
-                    LevelError::Read {
-                        path: path.to_path_buf(),
-                        source,
-                    }
-                })?),
-                RC_32 => file
-                    .read_i32::<LittleEndian>()
-                    .map_err(|source| LevelError::Read {
-                        path: path.to_path_buf(),
-                        source,
-                    })?,
-                _ => 0,
+                RecordType::U16 => {
+                    i32::from(file.read_u16::<LittleEndian>().map_err(|source| {
+                        LevelError::Read {
+                            path: path.to_path_buf(),
+                            source,
+                        }
+                    })?)
+                }
+                RecordType::U32 => {
+                    file.read_i32::<LittleEndian>()
+                        .map_err(|source| LevelError::Read {
+                            path: path.to_path_buf(),
+                            source,
+                        })?
+                }
             };
             object[var_index] = value;
         }
@@ -697,6 +947,18 @@ fn read_object_vars(
     Ok(objects)
 }
 
+/// Reads a tilemap (foreground or background) from the level file.
+///
+/// # Arguments
+///
+/// * `entry_name` - Name of the directory entry ("fgmap" or "bgmap")
+///
+/// # Returns
+///
+/// A tuple containing:
+/// - Map width in tiles
+/// - Map height in tiles
+/// - Vector of tile indices (row-major order)
 fn read_map(
     directory: &SpeDirectory,
     file: &mut File,
@@ -747,6 +1009,12 @@ fn read_map(
     Ok((width, height, tiles))
 }
 
+/// Reads the background parallax scroll rate from the level file.
+///
+/// # Returns
+///
+/// A tuple containing (xmul, xdiv, ymul, ydiv) for parallax calculations.
+/// Defaults to (1, 8, 1, 8) if not present or invalid.
 fn read_bg_scroll_rate(
     directory: &SpeDirectory,
     file: &mut File,
@@ -766,7 +1034,7 @@ fn read_bg_scroll_rate(
         path: path.to_path_buf(),
         source,
     })?;
-    if marker != RC_32 {
+    if marker != RecordType::U32 as u8 {
         return Ok((1, 8, 1, 8));
     }
 
@@ -798,6 +1066,11 @@ fn read_bg_scroll_rate(
     Ok((bg_xmul, bg_xdiv, bg_ymul, bg_ydiv))
 }
 
+/// Reads the total count of objects in the level.
+///
+/// # Returns
+///
+/// The object count if the "object_list" entry exists, or `None` otherwise.
 fn read_object_count(
     directory: &SpeDirectory,
     file: &mut File,
@@ -823,6 +1096,14 @@ fn read_object_count(
     Ok(Some(count))
 }
 
+/// Reads a length-prefixed string from a specific file offset.
+///
+/// Similar to `read_cursor_len_prefixed_string`, but seeks to the offset first.
+///
+/// # Arguments
+///
+/// * `offset` - Byte offset in the file to seek to
+/// * `entry_name` - Name of the entry (for error reporting)
 fn read_len_prefixed_string(
     file: &mut File,
     path: &Path,
