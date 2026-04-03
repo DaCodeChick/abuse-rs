@@ -402,7 +402,11 @@ impl LevelData {
         let light_links = read_light_links(&directory, &mut file, path_ref)?;
 
         Ok(Self {
-            name: path_ref.display().to_string(),
+            name: path_ref
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string(),
             first_name,
             fg_width,
             fg_height,

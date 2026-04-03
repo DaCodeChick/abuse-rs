@@ -26,15 +26,10 @@ impl HudState {
 
 /// Spawns initial HUD text for the loaded level.
 pub fn spawn_hud(commands: &mut Commands, level: &LevelData, audio: &AudioState) {
-    let level_name = std::path::Path::new(&level.name)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or(&level.name);
-
     commands.spawn((
         Text::new(format!(
             "level: {}\nzoom: 100%\nobjects: {}\nlights: {}\naudio: {} ({}%)\ncontrols: WASD/arrows pan, wheel/Q/E zoom, F1 HUD, M mute, -/+ volume",
-            level_name,
+            level.name,
             level.objects.len(),
             level.lights.len(),
             if audio.enabled { "on" } else { "off" },
