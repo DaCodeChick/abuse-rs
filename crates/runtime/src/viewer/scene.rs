@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use crate::data::level::{LevelData, ObjectVar};
 
 use super::assets::{LegacyTileSet, ObjectSpriteLibrary};
-use super::object_render::{object_render_adjustment, resolve_object_sprite};
+use super::object_render::{object_render_adjustment, resolve_object_sprite, ObjectSpritePaths};
 
 /// Spawns foreground tiles for the level.
 pub fn spawn_fg_tiles(
@@ -90,6 +90,7 @@ pub fn spawn_objects(
     commands: &mut Commands,
     level: &LevelData,
     sprite_lib: Option<&ObjectSpriteLibrary>,
+    sprite_paths: &ObjectSpritePaths,
     images: &Assets<Image>,
     fg_world_w: f32,
     fg_world_h: f32,
@@ -99,7 +100,7 @@ pub fn spawn_objects(
     };
 
     for object in &level.objects {
-        if let Some((spe_rel, entry_name)) = resolve_object_sprite(object)
+        if let Some((spe_rel, entry_name)) = resolve_object_sprite(object, sprite_paths)
             && let Some(texture) = sprite_lib.get(spe_rel, &entry_name)
         {
             let x = object.var(ObjectVar::X).unwrap_or(0) as f32 - fg_world_w * 0.5;

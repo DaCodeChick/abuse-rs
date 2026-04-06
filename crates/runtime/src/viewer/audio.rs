@@ -10,6 +10,21 @@ use bevy::prelude::*;
 
 use crate::data::level::LevelData;
 
+/// Configurable one-shot SFX paths used for object-context audio cues.
+#[derive(Debug, Clone)]
+pub struct AudioSfxPaths {
+    /// Teleporter/door cue.
+    pub tp_door: String,
+    /// Teleport beam/electric cue.
+    pub tele2: String,
+    /// Spring cue.
+    pub spring: String,
+    /// Lava ambience cue.
+    pub lava: String,
+    /// Force-field/lightning cue.
+    pub force_field: String,
+}
+
 /// Runtime audio controls exposed to viewer systems.
 #[derive(Resource, Debug, Clone)]
 pub struct AudioState {
@@ -39,6 +54,7 @@ pub fn spawn_context_audio(
     asset_server: &AssetServer,
     audio_state: &AudioState,
     level: &LevelData,
+    sfx_paths: &AudioSfxPaths,
 ) {
     if !audio_state.enabled || audio_state.volume <= 0.0 {
         return;
@@ -67,7 +83,7 @@ pub fn spawn_context_audio(
         spawn_one_shot(
             commands,
             asset_server,
-            "sfx/telept01.wav",
+            sfx_paths.tp_door.as_str(),
             audio_state.volume * 0.45,
             Some(1.8),
         );
@@ -76,7 +92,7 @@ pub fn spawn_context_audio(
         spawn_one_shot(
             commands,
             asset_server,
-            "sfx/fadeon01.wav",
+            sfx_paths.tele2.as_str(),
             audio_state.volume * 0.38,
             Some(1.6),
         );
@@ -85,7 +101,7 @@ pub fn spawn_context_audio(
         spawn_one_shot(
             commands,
             asset_server,
-            "sfx/spring03.wav",
+            sfx_paths.spring.as_str(),
             audio_state.volume * 0.35,
             Some(1.0),
         );
@@ -94,7 +110,7 @@ pub fn spawn_context_audio(
         spawn_one_shot(
             commands,
             asset_server,
-            "sfx/lava01.wav",
+            sfx_paths.lava.as_str(),
             audio_state.volume * 0.3,
             Some(1.4),
         );
@@ -103,7 +119,7 @@ pub fn spawn_context_audio(
         spawn_one_shot(
             commands,
             asset_server,
-            "sfx/force01.wav",
+            sfx_paths.force_field.as_str(),
             audio_state.volume * 0.32,
             Some(1.2),
         );
@@ -114,7 +130,7 @@ pub fn spawn_context_audio(
 pub fn spawn_one_shot(
     commands: &mut Commands,
     asset_server: &AssetServer,
-    path: &'static str,
+    path: &str,
     volume: f32,
     max_duration_secs: Option<f32>,
 ) {
@@ -125,7 +141,7 @@ pub fn spawn_one_shot(
     }
 
     commands.spawn((
-        AudioPlayer::new(asset_server.load(path)),
+        AudioPlayer::new(asset_server.load(path.to_string())),
         settings,
         OneShotAudio,
     ));

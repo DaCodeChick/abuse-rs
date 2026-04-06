@@ -50,13 +50,14 @@ pub fn load_legacy_tile_set(
     level_path: &Path,
     fg_tile_paths: &[&str],
     bg_tile_paths: &[&str],
+    palette_spe_path: &str,
     images: &mut Assets<Image>,
     fallback_tile_size: f32,
 ) -> Result<LegacyTileSet, String> {
     let data_root = derive_data_root(level_path)
         .ok_or_else(|| format!("could not derive data root from {}", level_path.display()))?;
 
-    let palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
+    let palette = read_palette(&data_root.join(palette_spe_path))?;
 
     let mut fg_tiles = HashMap::new();
     let mut bg_tiles = HashMap::new();
@@ -105,11 +106,12 @@ pub fn load_legacy_tile_set(
 pub fn load_object_sprite_library(
     level_path: &Path,
     object_spe_paths: &[&str],
+    fallback_palette_spe_path: &str,
     images: &mut Assets<Image>,
 ) -> Result<ObjectSpriteLibrary, String> {
     let data_root = derive_data_root(level_path)
         .ok_or_else(|| format!("could not derive data root from {}", level_path.display()))?;
-    let fallback_palette = read_palette(&data_root.join("art/back/backgrnd.spe"))?;
+    let fallback_palette = read_palette(&data_root.join(fallback_palette_spe_path))?;
 
     let mut sprites = HashMap::new();
     for rel in object_spe_paths {

@@ -19,6 +19,7 @@ use serde_json::Value;
 struct LevelDump {
     name: String,
     first_name: Option<String>,
+    asset_paths: AssetPathsDump,
     foreground: MapDump,
     background: MapDump,
     bg_scroll_rate: BgScrollRate,
@@ -102,6 +103,102 @@ struct LightLinkDump {
     to_light: i32,
 }
 
+#[derive(Debug, Serialize)]
+struct AssetPathsDump {
+    palette_spe: String,
+    fg_tile_spes: Vec<String>,
+    bg_tile_spes: Vec<String>,
+    object_spes: Vec<String>,
+    object_sprite_spes: ObjectSpriteSpeMapDump,
+    audio_sfx: AudioSfxDump,
+}
+
+#[derive(Debug, Serialize)]
+struct ObjectSpriteSpeMapDump {
+    door: String,
+    chars_door: String,
+    misc: String,
+    teleport: String,
+    lava: String,
+    ball: String,
+    compass: String,
+    rob2: String,
+    lightin: String,
+    trap_door: String,
+    step: String,
+}
+
+#[derive(Debug, Serialize)]
+struct AudioSfxDump {
+    tp_door: String,
+    tele2: String,
+    spring: String,
+    lava: String,
+    force_field: String,
+}
+
+fn default_asset_paths_dump() -> AssetPathsDump {
+    AssetPathsDump {
+        palette_spe: "art/back/backgrnd.spe".to_string(),
+        fg_tile_spes: vec![
+            "art/fore/foregrnd.spe".to_string(),
+            "art/fore/techno.spe".to_string(),
+            "art/fore/techno2.spe".to_string(),
+            "art/fore/techno3.spe".to_string(),
+            "art/fore/techno4.spe".to_string(),
+            "art/fore/cave.spe".to_string(),
+            "art/fore/alien.spe".to_string(),
+            "art/fore/trees.spe".to_string(),
+            "art/fore/endgame.spe".to_string(),
+            "art/fore/trees2.spe".to_string(),
+        ],
+        bg_tile_spes: vec![
+            "art/back/backgrnd.spe".to_string(),
+            "art/back/intro.spe".to_string(),
+            "art/back/city.spe".to_string(),
+            "art/back/cave.spe".to_string(),
+            "art/back/tech.spe".to_string(),
+            "art/back/alienb.spe".to_string(),
+            "art/back/green2.spe".to_string(),
+            "art/back/galien.spe".to_string(),
+        ],
+        object_spes: vec![
+            "art/door.spe".to_string(),
+            "art/chars/door.spe".to_string(),
+            "art/chars/tdoor.spe".to_string(),
+            "art/chars/teleport.spe".to_string(),
+            "art/chars/platform.spe".to_string(),
+            "art/chars/lightin.spe".to_string(),
+            "art/chars/lava.spe".to_string(),
+            "art/chars/step.spe".to_string(),
+            "art/ball.spe".to_string(),
+            "art/compass.spe".to_string(),
+            "art/rob2.spe".to_string(),
+            "art/misc.spe".to_string(),
+        ],
+        object_sprite_spes: ObjectSpriteSpeMapDump {
+            door: "art/door.spe".to_string(),
+            chars_door: "art/chars/door.spe".to_string(),
+            misc: "art/misc.spe".to_string(),
+            teleport: "art/chars/teleport.spe".to_string(),
+            lava: "art/chars/lava.spe".to_string(),
+            ball: "art/ball.spe".to_string(),
+            compass: "art/compass.spe".to_string(),
+            rob2: "art/rob2.spe".to_string(),
+            lightin: "art/chars/lightin.spe".to_string(),
+            trap_door: "art/chars/tdoor.spe".to_string(),
+            step: "art/chars/step.spe".to_string(),
+        },
+        audio_sfx: AudioSfxDump {
+            tp_door: "sfx/telept01.wav".to_string(),
+            tele2: "sfx/fadeon01.wav".to_string(),
+            spring: "sfx/spring03.wav".to_string(),
+            lava: "sfx/lava01.wav".to_string(),
+            force_field: "sfx/force01.wav".to_string(),
+        },
+    }
+}
+
 fn create_level_dump(level: &LevelData) -> LevelDump {
     const SAMPLE_SIZE: usize = 10;
 
@@ -159,6 +256,7 @@ fn create_level_dump(level: &LevelData) -> LevelDump {
     LevelDump {
         name: level.name.clone(),
         first_name: level.first_name.clone(),
+        asset_paths: default_asset_paths_dump(),
         foreground: MapDump {
             width: level.fg_width,
             height: level.fg_height,

@@ -1,6 +1,65 @@
 {
   "name": "level19",
   "first_name": "levels/level19.spe",
+  "asset_paths": {
+    "palette_spe": "art/back/backgrnd.spe",
+    "fg_tile_spes": [
+      "art/fore/foregrnd.spe",
+      "art/fore/techno.spe",
+      "art/fore/techno2.spe",
+      "art/fore/techno3.spe",
+      "art/fore/techno4.spe",
+      "art/fore/cave.spe",
+      "art/fore/alien.spe",
+      "art/fore/trees.spe",
+      "art/fore/endgame.spe",
+      "art/fore/trees2.spe"
+    ],
+    "bg_tile_spes": [
+      "art/back/backgrnd.spe",
+      "art/back/intro.spe",
+      "art/back/city.spe",
+      "art/back/cave.spe",
+      "art/back/tech.spe",
+      "art/back/alienb.spe",
+      "art/back/green2.spe",
+      "art/back/galien.spe"
+    ],
+    "object_spes": [
+      "art/door.spe",
+      "art/chars/door.spe",
+      "art/chars/tdoor.spe",
+      "art/chars/teleport.spe",
+      "art/chars/platform.spe",
+      "art/chars/lightin.spe",
+      "art/chars/lava.spe",
+      "art/chars/step.spe",
+      "art/ball.spe",
+      "art/compass.spe",
+      "art/rob2.spe",
+      "art/misc.spe"
+    ],
+    "object_sprite_spes": {
+      "door": "art/door.spe",
+      "chars_door": "art/chars/door.spe",
+      "misc": "art/misc.spe",
+      "teleport": "art/chars/teleport.spe",
+      "lava": "art/chars/lava.spe",
+      "ball": "art/ball.spe",
+      "compass": "art/compass.spe",
+      "rob2": "art/rob2.spe",
+      "lightin": "art/chars/lightin.spe",
+      "trap_door": "art/chars/tdoor.spe",
+      "step": "art/chars/step.spe"
+    },
+    "audio_sfx": {
+      "tp_door": "sfx/telept01.wav",
+      "tele2": "sfx/fadeon01.wav",
+      "spring": "sfx/spring03.wav",
+      "lava": "sfx/lava01.wav",
+      "force_field": "sfx/force01.wav"
+    }
+  },
   "foreground": {
     "width": 160,
     "height": 100,
